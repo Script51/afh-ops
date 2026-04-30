@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AFH · OPS Frankfurt</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAz3Lc2AM2KPx6mST6WEH6ttduxyMTHWA&libraries=places,geometry&callback=gmapsReady"></script>
+<style>
+:root {
+  --bg:#0a0a0f;--surface:#111118;--s2:#1a1a24;--s3:#222230;
+  --border:#2a2a3a;--accent:#00e5a0;--blue:#0099ff;--warn:#ff6b35;
+  --text:#e8e8f0;--muted:#6666aa;--danger:#ff4466;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* LOGIN */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 20% 60%,rgba(0,229,160,.07),transparent 55%),
+             radial-gradient(ellipse at 80% 30%,rgba(0,153,255,.05),transparent 55%);}
+.login-box{width:420px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:44px;text-align:center;}
+.login-logo{font-size:30px;font-weight:800;color:var(--accent);letter-spacing:-1px;}
+.login-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin:4px 0 32px;}
+.user-select{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.user-btn{padding:14px 18px;border-radius:10px;border:1px solid var(--border);background:var(--s2);cursor:pointer;display:flex;align-items:center;gap:12px;transition:all .15s;text-align:left;}
+.user-btn:hover,.user-btn.sel{border-color:var(--accent);background:rgba(0,229,160,.06);}
+.u-av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;}
+.pin-wrap{display:none;margin-bottom:14px;}
+.pin-wrap.show{display:block;}
+.pin-input{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:'DM Mono',monospace;font-size:22px;letter-spacing:10px;text-align:center;outline:none;transition:border-color .15s;}
+.pin-input:focus{border-color:var(--accent);}
+.pin-hint{font-size:11px;color:var(--muted);margin-top:5px;font-family:'DM Mono',monospace;}
+.btn-login{width:100%;padding:13px;border-radius:8px;border:none;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:all .15s;}
+.btn-login:hover{background:#00ffb3;}
+.btn-login:disabled{opacity:.35;cursor:not-allowed;}
+
+/* APP */
+.app{display:none;}
+.app.on{display:flex;height:100vh;}
+
+/* SIDEBAR */
+.sidebar{width:216px;min-width:216px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;overflow-y:auto;}
+.logo{padding:0 18px 18px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.logo-t{font-size:17px;font-weight:800;color:var(--accent);}
+.logo-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
+.upill{margin:0 10px 10px;padding:9px 11px;border-radius:8px;background:var(--s2);border:1px solid var(--border);display:flex;align-items:center;gap:9px;}
+.upill-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px;flex-shrink:0;}
+.nav-sec{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;padding:12px 18px 4px;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 18px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;transition:all .15s;border-left:2px solid transparent;}
+.nav-item:hover{color:var(--text);background:var(--s2);}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,229,160,.04);}
+.nav-item.locked{opacity:.3;cursor:not-allowed;}
+.nav-badge{margin-left:auto;background:var(--warn);color:#000;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:800;}
+.logout{margin-top:auto;padding:9px 18px;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:9px;transition:color .15s;}
+.logout:hover{color:var(--danger);}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;background:var(--bg);}
+.header{padding:18px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:10;}
+.hdr-t{font-size:20px;font-weight:800;}
+.hdr-s{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px;}
+.content{padding:24px 28px;}
+
+/* BUTTONS */
+.btn{padding:7px 15px;border-radius:6px;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{background:#00ffb3;}
+.btn-secondary{background:var(--s2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:rgba(255,68,102,.1);color:var(--danger);border:1px solid rgba(255,68,102,.25);}
+.btn-sm{padding:5px 11px;font-size:12px;}
+.btn-xs{padding:3px 8px;font-size:11px;}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;}
+.card-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+
+/* STATS */
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;overflow:hidden;}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat.g::before{background:var(--accent);}
+.stat.b::before{background:var(--blue);}
+.stat.o::before{background:var(--warn);}
+.stat.r::before{background:var(--danger);}
+.stat-v{font-size:30px;font-weight:800;line-height:1;}
+.stat-l{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:1px;}
+.stat-s{font-size:11px;color:var(--muted);margin-top:5px;}
+
+/* TABLE */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead tr{border-bottom:1px solid var(--border);}
+th{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 12px;text-align:left;font-weight:500;}
+td{padding:10px 12px;border-bottom:1px solid rgba(42,42,58,.5);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--s2);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;}
+.bg{background:rgba(0,229,160,.12);color:var(--accent);border:1px solid rgba(0,229,160,.2);}
+.bb{background:rgba(0,153,255,.12);color:var(--blue);border:1px solid rgba(0,153,255,.2);}
+.bo{background:rgba(255,107,53,.12);color:var(--warn);border:1px solid rgba(255,107,53,.2);}
+.br{background:rgba(255,68,102,.12);color:var(--danger);border:1px solid rgba(255,68,102,.2);}
+.bx{background:rgba(102,102,170,.12);color:var(--muted);border:1px solid rgba(102,102,170,.2);}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:var(--s2);color:var(--muted);border:1px solid var(--border);margin:1px;}
+
+/* ALERTS */
+.alert{padding:11px 14px;border-radius:8px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px;}
+.al-w{background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.25);color:var(--warn);}
+.al-s{background:rgba(0,229,160,.1);border:1px solid rgba(0,229,160,.25);color:var(--accent);}
+.al-i{background:rgba(0,153,255,.1);border:1px solid rgba(0,153,255,.25);color:var(--blue);}
+.al-r{background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.25);color:var(--danger);}
+.al-txt strong{display:block;margin-bottom:1px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:26px;width:580px;max-width:94vw;max-height:90vh;overflow-y:auto;}
+.modal-t{font-size:17px;font-weight:800;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;}
+.modal-x{cursor:pointer;color:var(--muted);font-size:20px;line-height:1;}
+.modal-x:hover{color:var(--text);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;}
+
+/* FORM */
+.fg{margin-bottom:13px;}
+.fl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block;}
+.fi,.fs,.fta{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;outline:none;transition:border-color .15s;}
+.fi:focus,.fs:focus,.fta:focus{border-color:var(--accent);}
+.fs option{background:var(--s2);}
+.fta{resize:vertical;min-height:70px;}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;}
+.cbg{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;}
+.cbi{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;background:var(--s2);transition:border-color .15s;}
+.cbi:hover{border-color:var(--accent);}
+.cbi input{accent-color:var(--accent);}
+.section-divider{height:1px;background:var(--border);margin:16px 0;position:relative;}
+.section-divider span{position:absolute;top:-9px;left:0;background:var(--surface);padding:0 8px;font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;}
+
+/* MAP */
+.map-layout{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 65px);}
+.map-panel{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:14px;}
+.map-cont{position:relative;}
+#map{width:100%;height:100%;}
+.map-filter-t{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:12px 0 6px;}
+.emp-filter{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;border:1px solid var(--border);background:var(--s2);margin-bottom:5px;cursor:pointer;transition:all .15s;font-size:12px;font-weight:700;}
+.edot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.map-info{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;min-width:260px;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.map-info.show{display:block;}
+.map-info-x{position:absolute;top:10px;right:12px;cursor:pointer;color:var(--muted);font-size:18px;}
+
+/* DISPO */
+.dispo-case{background:linear-gradient(135deg,rgba(0,229,160,.07),rgba(0,153,255,.04));border:1px solid rgba(0,229,160,.15);border-radius:10px;padding:16px;margin-bottom:16px;}
+.dmatch{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:13px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:13px;transition:border-color .15s;}
+.dmatch:hover{border-color:var(--accent);}
+.mscore{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;}
+.mh{background:rgba(0,229,160,.15);color:var(--accent);border:2px solid var(--accent);}
+.mm{background:rgba(0,153,255,.15);color:var(--blue);border:2px solid var(--blue);}
+.ml{background:rgba(255,107,53,.15);color:var(--warn);border:2px solid var(--warn);}
+
+/* WOCHENPLAN */
+.wg{display:grid;grid-template-columns:110px repeat(5,1fr);gap:1px;background:var(--border);border-radius:8px;overflow:hidden;font-size:11px;}
+.wh{background:var(--s2);padding:7px;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.wl{background:var(--s2);padding:7px;font-size:11px;font-weight:700;display:flex;align-items:center;}
+.wc{background:var(--surface);padding:6px;min-height:50px;}
+.we{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.15);border-radius:3px;padding:2px 5px;font-size:10px;color:var(--accent);margin-bottom:2px;}
+.we.sub{background:rgba(0,229,160,.15);border-color:rgba(0,229,160,.3);}
+.we.sick{background:rgba(255,68,102,.08);border-color:rgba(255,68,102,.2);color:var(--danger);text-decoration:line-through;}
+
+/* PERF BARS */
+.pbar{height:4px;background:var(--s2);border-radius:2px;overflow:hidden;margin-top:5px;}
+.pfill{height:100%;border-radius:2px;}
+.pg{background:var(--accent);}
+.po{background:var(--warn);}
+.pr{background:var(--danger);}
+
+/* PAGES */
+.page{display:none;}
+.page.active{display:block;}
+.locked-pg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);text-align:center;gap:10px;}
+
+/* RADIUS TAG */
+.radius-result{background:rgba(0,153,255,.08);border:1px solid rgba(0,153,255,.2);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;color:var(--blue);}
+.radius-loading{display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+
+/* UTILS */
+.divider{height:1px;background:var(--border);margin:12px 0;}
+.fb{display:flex;justify-content:space-between;align-items:center;}
+.fg-row{display:flex;gap:9px;align-items:center;}
+.mb4{margin-bottom:14px;}
+.mb6{margin-bottom:22px;}
+.mt4{margin-top:14px;}
+.fw7{font-weight:700;}
+.tm{color:var(--muted);font-size:12px;}
+.ta{color:var(--accent);}
+.td{color:var(--danger);}
+.tw2{color:var(--warn);}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:13px 18px;font-size:13px;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{border-color:rgba(0,229,160,.4);color:var(--accent);}
+.toast.error{border-color:rgba(255,68,102,.4);color:var(--danger);}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{animation:spin .6s linear infinite;display:inline-block;}
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.leaflet-container{background:var(--bg)!important;}
+.leaflet-tile{filter:brightness(.7) saturate(.8) hue-rotate(180deg) invert(1);}
+.leaflet-popup-content-wrapper{background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);}
+.leaflet-popup-tip{background:var(--surface);}
+.leaflet-popup-content{font-family:'Syne',sans-serif;font-size:12px;margin:10px 14px;}
+.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">AFH · OPS</div>
+    <div class="login-sub">Frankfurt · Live System</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:20px;">Wer bist du?</div>
+    <div class="user-select">
+      <div class="user-btn" id="btn-niklas" onclick="selUser('niklas')">
+        <div class="u-av" style="background:linear-gradient(135deg,#00e5a0,#0099ff);color:#000;">N</div>
+        <div><div style="font-weight:700;font-size:14px;">Niklas</div><div style="font-size:11px;color:var(--muted);">Admin · Vollzugriff</div></div>
+        <span class="badge bg" style="margin-left:auto;font-size:10px;">ADMIN</span>
+      </div>
+      <div class="user-btn" id="btn-buero" onclick="selUser('buero')">
+        <div class="u-av" style="background:linear-gradient(135deg,#6633ff,#0099ff);color:#fff;">B</div>
+        <div><div style="font-weight:700;font-size:14px;">Bürokraft</div><div style="font-size:11px;color:var(--muted);">Dispo · Queue · Kunden</div></div>
+        <span class="badge bb" style="margin-left:auto;font-size:10px;">BÜRO</span>
+      </div>
+    </div>
+    <div class="pin-wrap" id="pin-wrap">
+      <input type="password" class="pin-input" id="pin-input" maxlength="4" placeholder="····" oninput="checkPin()" autocomplete="off">
+      <div class="pin-hint" id="pin-hint">PIN eingeben</div>
+    </div>
+    <button class="btn-login" id="btn-login" disabled onclick="doLogin()">Einloggen →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <nav class="sidebar">
+    <div class="logo"><div class="logo-t">AFH · OPS</div><div class="logo-s">Frankfurt · Live</div></div>
+    <div class="upill">
+      <div class="upill-av" id="upill-av"></div>
+      <div><div style="font-size:12px;font-weight:700;" id="upill-n"></div><div style="font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;" id="upill-r"></div></div>
+    </div>
+    <div class="nav-sec">Operativ</div>
+    <div class="nav-item active" onclick="go('dashboard')" id="n-dashboard"><span>⚡</span>Dashboard</div>
+    <div class="nav-item" onclick="go('karte')" id="n-karte"><span>🗺️</span>Gebietskarte</div>
+    <div class="nav-item" onclick="go('dispo')" id="n-dispo"><span>🔄</span>Dispo & Vertretung</div>
+    <div class="nav-item" onclick="go('queue')" id="n-queue"><span>📥</span>Aufgaben-Queue<span class="nav-badge" id="queue-badge">0</span></div>
+    <div class="nav-item" onclick="go('wochenplan')" id="n-wochenplan"><span>📅</span>Wochenplan</div>
+    <div class="nav-item" onclick="go('kunden')" id="n-kunden"><span>🏠</span>Kunden</div>
+    <div class="nav-item" onclick="go('erstgespraeche')" id="n-erstgespraeche"><span>📞</span>Erstgespräche</div>
+    <div class="nav-sec" id="ns-admin">Admin</div>
+    <div class="nav-item" onclick="go('mitarbeiter')" id="n-mitarbeiter"><span>👥</span>Mitarbeiter</div>
+    <div class="nav-item" onclick="go('performance')" id="n-performance"><span>🏆</span>Performance</div>
+    <div class="nav-item" onclick="go('kapazitaet')" id="n-kapazitaet"><span>📊</span>Kapazität</div>
+    <div class="nav-item" onclick="go('marketing')" id="n-marketing"><span>📡</span>Marketing</div>
+    <div class="nav-item" onclick="go('wochenbericht')" id="n-wochenbericht"><span>📧</span>Wochenbericht</div>
+    <div class="logout" onclick="doLogout()"><span>←</span>Abmelden</div>
+  </nav>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="header">
+        <div><div class="hdr-t" id="dash-title">Dashboard</div><div class="hdr-s" id="dash-date"></div></div>
+        <div class="fg-row">
+          <button class="btn btn-secondary btn-sm" onclick="go('karte')">🗺️ Karte</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-krankmeldung')">+ Krankmeldung</button>
+        </div>
+      </div>
+      <div class="content">
+        <div id="dash-alerts" class="mb4"></div>
+        <div id="probezeit-alerts" class="mb4"></div>
+        <div class="g4 mb6">
+          <div class="stat g"><div class="stat-v ta" id="s-ma">–</div><div class="stat-l">Mitarbeiter</div><div class="stat-s" id="s-ma-s">–</div></div>
+          <div class="stat b"><div class="stat-v" style="color:var(--blue)" id="s-ku">–</div><div class="stat-l">Kunden</div><div class="stat-s" id="s-ku-s">–</div></div>
+          <div class="stat o"><div class="stat-v tw2" id="s-vt">–</div><div class="stat-l">Offene Vertr.</div></div>
+          <div class="stat g"><div class="stat-v ta" id="s-eg">–</div><div class="stat-l">EG Pipeline</div></div>
+        </div>
+        <div class="g2">
+          <div class="card"><div class="card-title">📋 Diese Woche</div>
+            <table><thead><tr><th>Tag</th><th>Status</th><th>Einsätze</th></tr></thead>
+            <tbody id="week-table"></tbody></table>
+          </div>
+          <div class="card"><div class="card-title">🕐 Letzte Aktivität</div><div id="activity-feed"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KARTE -->
+    <div class="page" id="page-karte">
+      <div class="header">
+        <div><div class="hdr-t">Gebietskarte Frankfurt</div><div class="hdr-s">Echtzeit · Google Maps Koordinaten</div></div>
+        <div class="fg-row">
+          <button class="btn btn-secondary btn-sm" onclick="toggleMapView()">Ansicht wechseln</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-optimierung')">⚡ Cluster-Analyse</button>
+        </div>
+      </div>
+      <div class="map-layout">
+        <div class="map-panel">
+          <div class="map-filter-t">Mitarbeiter filtern</div>
+          <div id="emp-filters"></div>
+          <div style="margin-top:14px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:11px;">
+            <div class="map-filter-t" style="margin-top:0;">Statistik</div>
+            <div class="fb" style="font-size:12px;margin-bottom:4px;"><span class="tm">Mitarbeiter</span><span class="fw7" id="map-ma-count">–</span></div>
+            <div class="fb" style="font-size:12px;margin-bottom:4px;"><span class="tm">Kunden</span><span class="fw7" id="map-ku-count">–</span></div>
+            <div class="fb" style="font-size:12px;"><span class="tm">Cluster-Potenzial</span><span class="ta fw7" id="cluster-count">–</span></div>
+          </div>
+          <div style="margin-top:10px;">
+            <div class="map-filter-t">Legende</div>
+            <div style="font-size:11px;color:var(--muted);line-height:2;">
+              <div>● Kreis = Mitarbeiter</div>
+              <div>■ Quadrat = Kunde</div>
+              <div>Farbe = zuständiger MA</div>
+            </div>
+          </div>
+        </div>
+        <div class="map-cont">
+          <div id="map"></div>
+          <div class="map-info" id="map-info">
+            <div class="map-info-x" onclick="document.getElementById('map-info').classList.remove('show')">×</div>
+            <div style="font-weight:800;font-size:14px;margin-bottom:3px;" id="mi-title"></div>
+            <div class="tm" id="mi-sub"></div>
+            <div style="margin-top:8px;font-size:12px;" id="mi-body"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DISPO -->
+    <div class="page" id="page-dispo">
+      <div class="header">
+        <div><div class="hdr-t">Dispo & Vertretung</div><div class="hdr-s">Google Maps Fahrtzeit-Matching</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('m-krankmeldung')">+ Ausfall melden</button>
+      </div>
+      <div class="content">
+        <div id="dispo-cases"></div>
+        <div class="divider"></div>
+        <div class="card-title" style="margin-bottom:10px;">✅ Abgeschlossene Vertretungen</div>
+        <div id="dispo-done"></div>
+      </div>
+    </div>
+
+    <!-- QUEUE -->
+    <div class="page" id="page-queue">
+      <div class="header">
+        <div><div class="hdr-t">Aufgaben-Queue</div><div class="hdr-s">KI-Agent Eingang · Freigaben</div></div>
+        <span class="badge bo" id="queue-count-badge">0 offen</span>
+      </div>
+      <div class="content">
+        <div class="alert al-i mb4"><span>🤖</span><div class="al-txt"><strong>Vorschlag prüfen → Freigeben → In AFH-Software nachtragen</strong></div></div>
+        <div id="queue-items"></div>
+      </div>
+    </div>
+
+    <!-- WOCHENPLAN -->
+    <div class="page" id="page-wochenplan">
+      <div class="header">
+        <div><div class="hdr-t">Wochenplan</div><div class="hdr-s" id="wp-week">–</div></div>
+        <div class="fg-row">
+          <button class="btn btn-secondary btn-sm" onclick="changeWeek(-1)">← Vorwoche</button>
+          <button class="btn btn-secondary btn-sm" onclick="changeWeek(1)">Nächste →</button>
+        </div>
+      </div>
+      <div class="content"><div class="card"><div id="wp-grid"></div></div></div>
+    </div>
+
+    <!-- KUNDEN -->
+    <div class="page" id="page-kunden">
+      <div class="header">
+        <div><div class="hdr-t">Kunden</div><div class="hdr-s" id="ku-sub">–</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('m-kunde')">+ Kunde anlegen</button>
+      </div>
+      <div class="content">
+        <div class="card mb4"><input type="text" class="fi" placeholder="🔍 Name, Stadtteil…" oninput="filterKunden(this.value)" style="margin:0;"></div>
+        <div class="card"><div class="tw"><table>
+          <thead><tr><th>Name</th><th>Stadtteil</th><th>Std/Wo</th><th>Mitarbeiter</th><th>Herkunft</th><th>Status</th><th></th></tr></thead>
+          <tbody id="ku-table"></tbody>
+        </table></div></div>
+      </div>
+    </div>
+
+    <!-- ERSTGESPRÄCHE -->
+    <div class="page" id="page-erstgespraeche">
+      <div class="header">
+        <div><div class="hdr-t">Erstgespräche & Pipeline</div><div class="hdr-s">Telefonat · Vor-Ort · Aufnahme</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('m-eg')">+ Neue Anfrage</button>
+      </div>
+      <div class="content">
+        <div class="g3 mb6">
+          <div class="stat b"><div class="stat-v" style="color:var(--blue)" id="eg-offen">–</div><div class="stat-l">In Pipeline</div></div>
+          <div class="stat g"><div class="stat-v ta" id="eg-done">–</div><div class="stat-l">Aufgenommen</div></div>
+          <div class="stat o"><div class="stat-v tw2" id="eg-koop">–</div><div class="stat-l">Kooperation nötig</div></div>
+        </div>
+        <div class="card"><div class="tw"><table>
+          <thead><tr><th>Name</th><th>Stadtteil</th><th>Pflegegrad</th><th>Kasse</th><th>Bedarf</th><th>Termin</th><th>Status</th><th></th></tr></thead>
+          <tbody id="eg-table"></tbody>
+        </table></div></div>
+      </div>
+    </div>
+
+    <!-- MITARBEITER -->
+    <div class="page" id="page-mitarbeiter">
+      <div class="header">
+        <div><div class="hdr-t">Mitarbeiter</div><div class="hdr-s" id="ma-sub">–</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('m-mitarbeiter')">+ Anlegen</button>
+      </div>
+      <div class="content"><div class="g3" id="ma-grid"></div></div>
+    </div>
+
+    <!-- PERFORMANCE -->
+    <div class="page" id="page-performance">
+      <div class="header"><div><div class="hdr-t">Performance & Bonus</div></div></div>
+      <div class="content">
+        <div id="perf-top"></div>
+        <div class="card mb4"><div class="card-title">Ranking</div>
+          <table><thead><tr><th>Mitarbeiter</th><th>Vertretungen</th><th>Kranktage</th><th>Bonus</th><th>Status</th></tr></thead>
+          <tbody id="perf-table"></tbody></table>
+        </div>
+        <div class="card"><div class="card-title">Krankmuster</div><div id="perf-muster"></div></div>
+      </div>
+    </div>
+
+    <!-- KAPAZITÄT -->
+    <div class="page" id="page-kapazitaet">
+      <div class="header"><div><div class="hdr-t">Kapazitätsplaner</div><div class="hdr-s">Wachstum · Einstellungsempfehlungen</div></div></div>
+      <div class="content">
+        <div id="kap-alerts" class="mb4"></div>
+        <div class="g2 mb4">
+          <div class="card"><div class="card-title">Auslastung</div><div id="kap-bars"></div></div>
+          <div class="card"><div class="card-title">Prognose 3 Monate</div>
+            <table><thead><tr><th>Monat</th><th>Kunden</th><th>Auslastung</th><th>Status</th></tr></thead>
+            <tbody id="kap-table"></tbody></table>
+          </div>
+        </div>
+        <div class="card"><div class="card-title">📅 Einstellungsempfehlungen · Hessen Feiertage</div><div id="kap-feier"></div></div>
+      </div>
+    </div>
+
+    <!-- MARKETING -->
+    <div class="page" id="page-marketing">
+      <div class="header"><div><div class="hdr-t">Marketing & Herkunft</div></div></div>
+      <div class="content">
+        <div class="g4 mb6" id="mkt-stats"></div>
+        <div class="card"><div class="card-title">Herkunft Details</div>
+          <table><thead><tr><th>Kanal</th><th>Kunden</th><th>Anteil</th></tr></thead>
+          <tbody id="mkt-table"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- WOCHENBERICHT -->
+    <div class="page" id="page-wochenbericht">
+      <div class="header">
+        <div><div class="hdr-t">Wochenbericht</div><div class="hdr-s">Automatisch Montag 07:00</div></div>
+        <button class="btn btn-primary btn-sm" onclick="generateReport()">Vorschau generieren</button>
+      </div>
+      <div class="content">
+        <div class="card mb4">
+          <div class="fg"><label class="fl">Empfänger</label><input type="email" class="fi" id="report-email" value="niklas@afh-frankfurt.de"></div>
+        </div>
+        <div class="card" id="report-preview" style="display:none;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MODALS ═══ -->
+
+<!-- KRANKMELDUNG / AUSFALL -->
+<div class="modal-overlay" id="m-krankmeldung">
+  <div class="modal">
+    <div class="modal-t">🤒 Ausfall melden <span class="modal-x" onclick="closeModal('m-krankmeldung')">×</span></div>
+    <div class="fg"><label class="fl">Mitarbeiter</label><select class="fs" id="km-ma"><option value="">– wählen –</option></select></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Von</label><input type="date" class="fi" id="km-von"></div>
+      <div class="fg"><label class="fl">Bis (voraussichtlich)</label><input type="date" class="fi" id="km-bis"></div>
+    </div>
+    <div class="fg"><label class="fl">Grund</label>
+      <select class="fs" id="km-grund"><option>Krank</option><option>Urlaub</option><option>Notfall</option><option>Sonstiges</option></select>
+    </div>
+    <div class="fg"><label class="fl">Notiz</label><input type="text" class="fi" id="km-notiz" placeholder="Optional"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-krankmeldung')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveKrankmeldung()">Dispo starten →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MITARBEITER -->
+<div class="modal-overlay" id="m-mitarbeiter">
+  <div class="modal">
+    <div class="modal-t">👤 Mitarbeiter anlegen <span class="modal-x" onclick="closeModal('m-mitarbeiter')">×</span></div>
+
+    <div class="section-divider"><span>Persönliche Daten</span></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Vorname</label><input type="text" class="fi" id="ma-vn"></div>
+      <div class="fg"><label class="fl">Nachname</label><input type="text" class="fi" id="ma-nn"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Telefon</label><input type="text" class="fi" id="ma-tel"></div>
+      <div class="fg"><label class="fl">E-Mail</label><input type="email" class="fi" id="ma-email"></div>
+    </div>
+
+    <div class="section-divider"><span>Adresse & Einsatzgebiet</span></div>
+    <div class="fg"><label class="fl">Vollständige Adresse</label>
+      <input type="text" class="fi" id="ma-adresse" placeholder="Musterstraße 12, 60311 Frankfurt am Main"
+        oninput="onAdresseInput(this.value)">
+      <div class="radius-loading" id="radius-loading"><span class="spin">⟳</span> Berechne Radius…</div>
+      <div class="radius-result" id="radius-result" style="display:none;"></div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Mobilität</label>
+        <select class="fs" id="ma-mob" onchange="onMobChange()">
+          <option value="PKW">PKW</option>
+          <option value="ÖPNV">ÖPNV</option>
+          <option value="PKW + ÖPNV">PKW + ÖPNV</option>
+          <option value="Fahrrad">Fahrrad</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Verfügbarkeit</label><input type="text" class="fi" id="ma-verf" placeholder="Mo–Fr 08:00–16:00"></div>
+    </div>
+    <div class="fg"><label class="fl">Einsatzgebiete (PLZ / Stadtteile)</label>
+      <input type="text" class="fi" id="ma-gebiete" placeholder="Wird automatisch berechnet oder manuell eingeben">
+    </div>
+
+    <div class="section-divider"><span>Besonderheiten</span></div>
+    <div class="fg"><label class="fl">Fähigkeiten / Einschränkungen</label>
+      <div class="cbg">
+        <label class="cbi"><input type="checkbox" id="ma-grundreinigung"> Grundreinigung</label>
+        <label class="cbi"><input type="checkbox" id="ma-angst-tiere"> Angst vor Tieren</label>
+        <label class="cbi"><input type="checkbox" id="ma-raucher"> Raucher</label>
+        <label class="cbi"><input type="checkbox" id="ma-rollstuhl"> Rollstuhl OK</label>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Allergien (Freitext)</label>
+      <input type="text" class="fi" id="ma-allergie" placeholder="z.B. Katzen, Hunde, Hausstaub…">
+    </div>
+
+    <div class="section-divider"><span>Anstellung</span></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Eingestellt am</label>
+        <input type="date" class="fi" id="ma-ein" onchange="autoProbezeit()">
+      </div>
+      <div class="fg"><label class="fl">Probezeit bis (auto)</label>
+        <input type="date" class="fi" id="ma-probe" placeholder="Wird automatisch gesetzt">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-mitarbeiter')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveMitarbeiter()">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- KUNDE -->
+<div class="modal-overlay" id="m-kunde">
+  <div class="modal">
+    <div class="modal-t">🏠 Kunde anlegen <span class="modal-x" onclick="closeModal('m-kunde')">×</span></div>
+    <div class="fr"><div class="fg"><label class="fl">Vorname</label><input type="text" class="fi" id="ku-vn"></div><div class="fg"><label class="fl">Nachname</label><input type="text" class="fi" id="ku-nn"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">Telefon</label><input type="text" class="fi" id="ku-tel"></div><div class="fg"><label class="fl">PLZ</label><input type="text" class="fi" id="ku-plz"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">Stadtteil</label><input type="text" class="fi" id="ku-st"></div><div class="fg"><label class="fl">Std/Woche</label><input type="number" class="fi" id="ku-std" step="0.5"></div></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Mitarbeiter</label><select class="fs" id="ku-ma"><option value="">– wählen –</option></select></div>
+      <div class="fg"><label class="fl">Herkunft</label><select class="fs" id="ku-herkunft"><option>Empfehlung</option><option>Google</option><option>Pflegedienst</option><option>Flyer</option><option>Sanitätshaus</option><option>Sonstiges</option></select></div>
+    </div>
+    <div class="fg"><label class="fl">Besonderheiten</label>
+      <div class="cbg">
+        <label class="cbi"><input type="checkbox" id="ku-raucher"> Raucher HH</label>
+        <label class="cbi"><input type="checkbox" id="ku-hund"> Hund</label>
+        <label class="cbi"><input type="checkbox" id="ku-katze"> Katze</label>
+        <label class="cbi"><input type="checkbox" id="ku-barrier"> Barrierefrei</label>
+        <label class="cbi"><input type="checkbox" id="ku-rstuhl"> Rollstuhl</label>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Hausarzt</label><input type="text" class="fi" id="ku-hausarzt"></div>
+    <div class="fg"><label class="fl">Notfallkontakt</label><input type="text" class="fi" id="ku-notfall"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-kunde')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveKunde()">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ERSTGESPRÄCH -->
+<div class="modal-overlay" id="m-eg">
+  <div class="modal">
+    <div class="modal-t">📞 Erstgespräch <span class="modal-x" onclick="closeModal('m-eg')">×</span></div>
+
+    <div style="background:rgba(0,153,255,.06);border:1px solid rgba(0,153,255,.15);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--blue);">
+      <strong>Teil 1 – Telefonat</strong> · Grunddaten + Pflegesituation aufnehmen
+    </div>
+
+    <div class="fr"><div class="fg"><label class="fl">Vorname</label><input type="text" class="fi" id="eg-vn"></div><div class="fg"><label class="fl">Nachname</label><input type="text" class="fi" id="eg-nn"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">Telefon</label><input type="text" class="fi" id="eg-tel"></div><div class="fg"><label class="fl">PLZ</label><input type="text" class="fi" id="eg-plz"></div></div>
+    <div class="fr"><div class="fg"><label class="fl">Stadtteil</label><input type="text" class="fi" id="eg-st"></div><div class="fg"><label class="fl">Std/Woche (ca.)</label><input type="number" class="fi" id="eg-std" step="0.5"></div></div>
+
+    <div class="section-divider"><span>Pflegesituation</span></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Pflegegrad</label>
+        <select class="fs" id="eg-pg">
+          <option value="">– kein / unbekannt –</option>
+          <option value="1">Pflegegrad 1</option>
+          <option value="2">Pflegegrad 2</option>
+          <option value="3">Pflegegrad 3</option>
+          <option value="4">Pflegegrad 4</option>
+          <option value="5">Pflegegrad 5</option>
+          <option value="ÖT">Öffentlicher Träger (ÖT)</option>
+          <option value="ÄV">Ärztliche Verordnung (ÄV)</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Abrechnungsart (optional)</label>
+        <div class="cbg" style="margin-top:8px;">
+          <label class="cbi"><input type="checkbox" id="eg-privat"> Privat</label>
+          <label class="cbi"><input type="checkbox" id="eg-beihilfe"> Beihilfeberechtigt</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="fg"><label class="fl">Pflegekasse</label>
+      <select class="fs" id="eg-kasse">
+        <option value="">– keine / unbekannt –</option>
+        <optgroup label="Gesetzliche Krankenkassen">
+          <option>AOK – Die Gesundheitskasse</option>
+          <option>Techniker Krankenkasse (TK)</option>
+          <option>BARMER</option>
+          <option>DAK-Gesundheit</option>
+          <option>KKH Kaufmännische Krankenkasse</option>
+          <option>IKK classic</option>
+          <option>IKK gesund plus</option>
+          <option>BKK VBU</option>
+          <option>BKK ProVita</option>
+          <option>Knappschaft</option>
+          <option>hkk Krankenkasse</option>
+          <option>HEK – Hanseatische Krankenkasse</option>
+          <option>Mobil Krankenkasse</option>
+          <option>Vivida BKK</option>
+          <option>WMF BKK</option>
+          <option>mhplus BKK</option>
+          <option>Siemens-Betriebskrankenkasse (SBK)</option>
+          <option>Continentale BKK</option>
+          <option>Pronova BKK</option>
+          <option>actimonda BKK</option>
+        </optgroup>
+        <optgroup label="Private Krankenversicherung">
+          <option>Allianz Private KV</option>
+          <option>AXA Krankenversicherung</option>
+          <option>Debeka Krankenversicherung</option>
+          <option>DKV Deutsche Krankenversicherung</option>
+          <option>Signal Iduna</option>
+          <option>HUK-COBURG</option>
+          <option>Barmenia Krankenversicherung</option>
+          <option>DEVK Krankenversicherung</option>
+          <option>Gothaer Krankenversicherung</option>
+          <option>Generali Deutschland</option>
+          <option>Württembergische Krankenversicherung</option>
+          <option>Hallesche Krankenversicherung</option>
+        </optgroup>
+        <optgroup label="Sonstige">
+          <option>Privat (ohne Kasse)</option>
+          <option>Beihilfe</option>
+          <option>Sonstiges</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="section-divider"><span>Bedarf & Termin</span></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Bedarf</label>
+        <select class="fs" id="eg-bedarf"><option>Haushalt</option><option>Haushalt + Pflege</option><option>Haushalt + Umbau</option><option>Komplex</option></select>
+      </div>
+      <div class="fg"><label class="fl">Herkunft</label>
+        <select class="fs" id="eg-herkunft"><option>Empfehlung</option><option>Google</option><option>Pflegedienst</option><option>Flyer</option><option>Sanitätshaus</option><option>Sonstiges</option></select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Termin Erstgespräch</label><input type="datetime-local" class="fi" id="eg-termin"></div>
+
+    <div class="section-divider"><span>Kooperationen & Zusatz</span></div>
+    <div class="fg"><label class="fl">Pflegedienst benötigt?</label>
+      <div class="cbg"><label class="cbi"><input type="checkbox" id="eg-pflege"> Ja, Pflegedienst nötig</label></div>
+    </div>
+    <div class="fg"><label class="fl">Weitere Kooperation / Zusatzbedarf</label>
+      <input type="text" class="fi" id="eg-koop" placeholder="z.B. Badumbau, Sanitätshaus, Hausnotruf, Menüservice…">
+    </div>
+    <div class="fg"><label class="fl">Hausarzt</label><input type="text" class="fi" id="eg-hausarzt"></div>
+    <div class="fg"><label class="fl">Notizen</label><textarea class="fta" id="eg-notizen" placeholder="Besonderheiten, Wünsche, Anmerkungen aus dem Telefonat…"></textarea></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-eg')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveEG()">In Pipeline ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- OPTIMIERUNG -->
+<div class="modal-overlay" id="m-optimierung">
+  <div class="modal">
+    <div class="modal-t">⚡ Cluster-Analyse <span class="modal-x" onclick="closeModal('m-optimierung')">×</span></div>
+    <div id="optimierung-content"><div class="tm">Analysiere…</div></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-optimierung')">Schließen</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ CONFIG ════════════════════════════════════════════
+const SUPA_URL = 'https://hbhbqdqgkbrzmlaqlkme.supabase.co';
+const SUPA_KEY = 'sb_publishable_3WPYxgsTSjTUi0cO3vnbBQ_ikJkGw2D';
+const GMAPS_KEY = 'AIzaSyBAz3Lc2AM2KPx6mST6WEH6ttduxyMTHWA';
+const { createClient } = supabase;
+const db = createClient(SUPA_URL, SUPA_KEY);
+
+// Hessen Feiertage 2025/2026
+const HESSEN_FEIERTAGE = [
+  '2025-10-03','2025-10-31','2025-11-01','2025-12-25','2025-12-26',
+  '2026-01-01','2026-04-03','2026-04-06','2026-05-01','2026-05-14',
+  '2026-05-25','2026-06-04','2026-10-03','2026-10-31','2026-11-01',
+  '2026-12-25','2026-12-26'
+];
+
+// ═══ STATE ═════════════════════════════════════════════
+let currentUser = null;
+let allMA = [], allKU = [], allEG = [], allVT = [];
+let mapInstance = null, activeFilters = new Set(), empMarkers = {}, custMarkers = [];
+let weekOffset = 0;
+let gmapsReady = false;
+let adresseTimer = null;
+
+const PINS = { niklas:'1994', buero:'0000' };
+const COLORS = ['#00e5a0','#0099ff','#ff6b35','#cc44ff','#ffcc00','#ff4466','#00ccff','#88ff44'];
+
+// ═══ GOOGLE MAPS READY ═════════════════════════════════
+function gmapsReady() { gmapsReady = true; }
+
+// ═══ LOGIN ═════════════════════════════════════════════
+function selUser(u) {
+  currentUser = u;
+  document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('sel'));
+  document.getElementById('btn-'+u).classList.add('sel');
+  document.getElementById('pin-wrap').classList.add('show');
+  document.getElementById('pin-hint').textContent = u==='niklas' ? 'Admin-PIN (Demo: 1994)' : 'Büro-PIN (Demo: 0000)';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('btn-login').disabled = true;
+  document.getElementById('pin-input').focus();
+}
+function checkPin() {
+  document.getElementById('btn-login').disabled = document.getElementById('pin-input').value.length < 4;
+}
+async function doLogin() {
+  const pin = document.getElementById('pin-input').value;
+  if (pin !== PINS[currentUser]) {
+    document.getElementById('pin-hint').textContent = '❌ Falsche PIN';
+    document.getElementById('pin-hint').style.color = 'var(--danger)'; return;
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('on');
+  setupRole(currentUser);
+  await loadAll();
+  go('dashboard');
+  setTimeout(initMap, 400);
+}
+function setupRole(u) {
+  const isAdmin = u === 'niklas';
+  const av = document.getElementById('upill-av');
+  av.style.background = isAdmin ? 'linear-gradient(135deg,#00e5a0,#0099ff)' : 'linear-gradient(135deg,#6633ff,#0099ff)';
+  av.style.color = isAdmin ? '#000' : '#fff';
+  av.textContent = isAdmin ? 'N' : 'B';
+  document.getElementById('upill-n').textContent = isAdmin ? 'Niklas' : 'Bürokraft';
+  document.getElementById('upill-r').textContent = isAdmin ? 'ADMIN' : 'BÜRO';
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + ' · Frankfurt';
+  if (!isAdmin) {
+    ['n-mitarbeiter','n-performance','n-kapazitaet','n-marketing','n-wochenbericht'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.add('locked');
+      el.onclick = showLocked;
+    });
+    document.getElementById('ns-admin').textContent = '🔒 Admin (gesperrt)';
+  }
+}
+function doLogout() {
+  currentUser = null;
+  document.getElementById('app').classList.remove('on');
+  document.getElementById('login-screen').style.display = 'flex';
+  document.querySelectorAll('.user-btn').forEach(b => b.classList.remove('sel'));
+  document.getElementById('pin-wrap').classList.remove('show');
+  document.getElementById('pin-hint').style.color = '';
+  document.getElementById('btn-login').disabled = true;
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+}
+
+// ═══ DATA ══════════════════════════════════════════════
+async function loadAll() {
+  const [ma,ku,eg,vt] = await Promise.all([
+    db.from('mitarbeiter').select('*').order('nachname'),
+    db.from('kunden').select('*').order('nachname'),
+    db.from('erstgespraeche').select('*').order('created_at',{ascending:false}),
+    db.from('vertretungen').select('*').order('datum',{ascending:false}),
+  ]);
+  allMA = ma.data||[]; allKU = ku.data||[]; allEG = eg.data||[]; allVT = vt.data||[];
+  renderAll();
+}
+function renderAll() {
+  renderDashboard(); renderKunden(); renderMitarbeiter(); renderEG();
+  renderDispo(); renderPerformance(); renderKapazitaet(); renderMarketing();
+  renderWochenplan(); populateSelects();
+  if (mapInstance) renderMapMarkers();
+}
+
+// ═══ DASHBOARD ═════════════════════════════════════════
+function renderDashboard() {
+  const aktMA = allMA.filter(m=>m.status==='aktiv').length;
+  const aktKU = allKU.filter(k=>k.status==='aktiv').length;
+  const offVT = allVT.filter(v=>v.status==='offen').length;
+  const offEG = allEG.filter(e=>e.status==='offen').length;
+  document.getElementById('s-ma').textContent = aktMA;
+  document.getElementById('s-ku').textContent = aktKU;
+  document.getElementById('s-vt').textContent = offVT;
+  document.getElementById('s-eg').textContent = offEG;
+  const probe = allMA.filter(m=>m.probezeit_bis&&new Date(m.probezeit_bis)>new Date()).length;
+  document.getElementById('s-ma-s').textContent = probe>0 ? probe+' in Probezeit' : 'Alle aktiv';
+  document.getElementById('s-ku-s').textContent = allKU.filter(k=>k.status==='neu').length+' neu';
+
+  // Alerts
+  let alerts = '';
+  if (offVT>0) alerts += `<div class="alert al-w"><span>⚠️</span><div class="al-txt fw7">${offVT} offene Vertretung${offVT>1?'en':''} – Dispo öffnen</div><button class="btn btn-secondary btn-sm" onclick="go('dispo')">→</button></div>`;
+  const queue = allVT.filter(v=>v.status==='queue').length;
+  if (queue>0) alerts += `<div class="alert al-i"><span>📥</span><div class="al-txt fw7">${queue} Aufgaben in Queue</div><button class="btn btn-secondary btn-sm" onclick="go('queue')">→</button></div>`;
+  document.getElementById('dash-alerts').innerHTML = alerts || `<div class="alert al-s"><span>✅</span><div class="al-txt fw7">Alle Systeme OK</div></div>`;
+  document.getElementById('queue-badge').textContent = queue;
+  document.getElementById('queue-count-badge').textContent = queue+' offen';
+
+  // Probezeit alerts
+  const now = new Date(), oneMonth = new Date(now.getTime()+30*24*60*60*1000);
+  const baldProbe = allMA.filter(m=>m.probezeit_bis&&new Date(m.probezeit_bis)>now&&new Date(m.probezeit_bis)<oneMonth);
+  let pAlerts = '';
+  baldProbe.forEach(m=>{
+    const bis = new Date(m.probezeit_bis).toLocaleDateString('de-DE');
+    pAlerts += `<div class="alert al-r"><span>⏰</span><div class="al-txt"><strong>Probezeit endet bald: ${m.vorname} ${m.nachname}</strong>Probezeit bis ${bis} – Entscheidung treffen</div></div>`;
+  });
+  document.getElementById('probezeit-alerts').innerHTML = pAlerts;
+
+  // Week table
+  const days = ['Mo','Di','Mi','Do','Fr'];
+  const today = new Date().getDay();
+  let wt = days.map((d,i)=>`<tr><td class="fw7" ${today===i+1?'style="color:var(--accent)"':''}>${d}</td>
+    <td>${i===3&&offVT>0?'<span class="badge bo">⚠ '+offVT+' offen</span>':'<span class="badge bg">✓ OK</span>'}</td>
+    <td>${aktKU}</td></tr>`).join('');
+  document.getElementById('week-table').innerHTML = wt;
+
+  // Activity
+  const recent = [...allKU,...allMA,...allEG].filter(x=>x.created_at).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,4);
+  let af = recent.map((item,i)=>{
+    const isKU = item.stunden_pro_woche!==undefined;
+    const isMA = item.kranktage!==undefined;
+    const label = isKU?'Neukunde: ':isMA?'Mitarbeiter: ':'Erstgespräch: ';
+    return `<div class="fb" style="${i>0?'margin-top:8px;padding-top:8px;border-top:1px solid var(--border)':''}">
+      <div><div class="fw7" style="font-size:12px;">${label}${item.vorname||''} ${item.nachname||''}</div><div class="tm">${item.stadtteil||''}</div></div>
+      <span class="badge bx" style="font-size:10px;">${timeSince(item.created_at)}</span></div>`;
+  }).join('');
+  document.getElementById('activity-feed').innerHTML = af||'<div class="tm">Noch keine Aktivität</div>';
+}
+
+// ═══ MITARBEITER ═══════════════════════════════════════
+function renderMitarbeiter() {
+  document.getElementById('ma-sub').textContent = `${allMA.length} gesamt · ${allMA.filter(m=>m.probezeit_bis&&new Date(m.probezeit_bis)>new Date()).length} in Probezeit`;
+  const html = allMA.map((ma,i)=>{
+    const color = COLORS[i%COLORS.length];
+    const init = ((ma.vorname||'').charAt(0)+(ma.nachname||'').charAt(0)).toUpperCase();
+    const kCount = allKU.filter(k=>k.mitarbeiter_id===ma.id).length;
+    const pct = Math.min(100,kCount*20);
+    const probeBadge = ma.probezeit_bis&&new Date(ma.probezeit_bis)>new Date() ? `<span class="tag" style="color:var(--blue);">Probezeit</span>` : '';
+    return `<div class="card">
+      <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#000;margin-bottom:8px;">${init}</div>
+      <div class="fw7" style="font-size:14px;">${ma.vorname} ${ma.nachname}</div>
+      <div class="tm">${ma.mobilitaet||''} · ${ma.stadtteil||''}</div>
+      <div style="margin-top:6px;">
+        ${probeBadge}
+        ${ma.vertretungen>0?`<span class="tag" style="color:var(--accent);border-color:rgba(0,229,160,.2);">${ma.vertretungen} Vertr.</span>`:''}
+        ${ma.grundreinigung?'<span class="tag">Grundreinigung ✓</span>':''}
+        ${ma.allergie?`<span class="tag" style="color:var(--warn);">Allergie: ${ma.allergie}</span>`:''}
+        ${ma.angst_tiere?'<span class="tag" style="color:var(--warn);">Angst vor Tieren</span>':''}
+      </div>
+      ${ma.einsatzgebiete?`<div class="tm" style="margin-top:6px;font-size:10px;">📍 ${ma.einsatzgebiete}</div>`:''}
+      <div class="pbar mt4"><div class="pfill ${pct>90?'pr':pct>70?'po':'pg'}" style="width:${pct}%"></div></div>
+      <div class="tm" style="font-size:10px;margin-top:2px;">${kCount} Kunden</div>
+    </div>`;
+  }).join('');
+  document.getElementById('ma-grid').innerHTML = html||'<div class="tm">Noch keine Mitarbeiter anlegt</div>';
+}
+
+// ═══ KUNDEN ════════════════════════════════════════════
+function renderKunden(filter='') {
+  const list = filter ? allKU.filter(k=>[k.nachname,k.vorname,k.stadtteil].join(' ').toLowerCase().includes(filter.toLowerCase())) : allKU;
+  document.getElementById('ku-sub').textContent = `${allKU.length} aktiv · ${allKU.filter(k=>k.status==='neu').length} neu`;
+  const html = list.map(k=>{
+    const ma = allMA.find(m=>m.id===k.mitarbeiter_id);
+    return `<tr>
+      <td><div class="fw7">${k.nachname}, ${k.vorname}</div><div class="tm">${k.telefon||''}</div></td>
+      <td>${k.stadtteil||'–'}</td><td>${k.stunden_pro_woche||'–'}h</td>
+      <td>${ma?`${ma.vorname} ${ma.nachname.charAt(0)}.`:'<span class="badge bo">Offen</span>'}</td>
+      <td><span class="tag">${k.herkunft||'–'}</span></td>
+      <td><span class="badge ${k.status==='aktiv'?'bg':k.status==='neu'?'bb':'bx'}">${k.status}</span></td>
+      <td></td></tr>`;
+  }).join('');
+  document.getElementById('ku-table').innerHTML = html||'<tr><td colspan="7" class="tm">Keine Kunden</td></tr>';
+}
+function filterKunden(v) { renderKunden(v); }
+
+// ═══ ERSTGESPRÄCHE ═════════════════════════════════════
+function renderEG() {
+  document.getElementById('eg-offen').textContent = allEG.filter(e=>e.status==='offen').length;
+  document.getElementById('eg-done').textContent = allEG.filter(e=>e.status==='aufgenommen').length;
+  document.getElementById('eg-koop').textContent = allEG.filter(e=>e.kooperation||e.pflegedienst_bedarf).length;
+  const html = allEG.map(e=>{
+    const termin = e.termin_datum ? new Date(e.termin_datum).toLocaleDateString('de-DE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '–';
+    const sc = e.status==='aufgenommen'?'bg':e.status==='offen'?'bb':'bx';
+    const pg = e.pflegegrad ? `<span class="tag">PG ${e.pflegegrad}</span>` : '';
+    const kasse = e.pflegekasse ? `<div class="tm" style="font-size:10px;">${e.pflegekasse.substring(0,20)}…</div>` : '';
+    return `<tr>
+      <td><div class="fw7">${e.nachname}, ${e.vorname}</div><div class="tm">${e.telefon||''}</div></td>
+      <td>${e.stadtteil||'–'}</td>
+      <td>${pg}</td>
+      <td style="max-width:120px;">${kasse}</td>
+      <td>${e.bedarf||'–'}</td>
+      <td>${termin}</td>
+      <td><span class="badge ${sc}">${e.status}</span></td>
+      <td><button class="btn btn-secondary btn-xs" onclick="aufnehmenEG('${e.id}')">Aufnehmen</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('eg-table').innerHTML = html||'<tr><td colspan="8" class="tm">Keine Anfragen</td></tr>';
+}
+
+// ═══ DISPO ═════════════════════════════════════════════
+function renderDispo() {
+  const offene = allVT.filter(v=>v.status==='offen');
+  const html = offene.map(vt=>{
+    const ku = allKU.find(k=>k.id===vt.kunde_id);
+    const origMA = allMA.find(m=>m.id===vt.original_ma_id);
+    const matches = getMatches(vt, ku);
+    return `<div class="dispo-case">
+      <div class="fb mb4">
+        <div>
+          <div class="fw7" style="font-size:15px;">⚠️ ${origMA?.vorname||'?'} ${origMA?.nachname||'?'} – ${new Date(vt.datum).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'short'})}</div>
+          <div class="tm">${ku?.vorname||'?'} ${ku?.nachname||'?'} · ${ku?.stadtteil||''} · ${vt.grund||'Krank'}</div>
+          ${ku?.haustier?`<div class="tm" style="color:var(--warn);">⚠ Haustier: ${ku.haustier}</div>`:''}
+          ${ku?.raucher_hh?'<div class="tm" style="color:var(--warn);">⚠ Raucherhaushalt</div>':''}
+        </div>
+        <span class="badge bo">Ungelöst</span>
+      </div>
+      <div class="card-title">🤖 Beste Matches (Google Maps Fahrtzeit)</div>
+      ${matches.map((m,i)=>`
+        <div class="dmatch">
+          <div class="mscore ${i===0?'mh':i===1?'mm':'ml'}">${m.score}%</div>
+          <div style="flex:1;">
+            <div class="fw7">${m.name}</div>
+            <div class="tm">${m.details}</div>
+            <div style="margin-top:4px;">${m.tags}</div>
+          </div>
+          <div class="fg-row">
+            <button class="btn btn-${i===0?'primary':'secondary'} btn-sm" onclick="confirmMatch('${vt.id}','${m.id}','${m.name}')">✓ Einsetzen</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+  document.getElementById('dispo-cases').innerHTML = html||`<div class="alert al-s"><span>✅</span><div class="al-txt fw7">Keine offenen Fälle</div></div>`;
+
+  const done = allVT.filter(v=>v.status==='erledigt').slice(0,5).map(vt=>{
+    const ku = allKU.find(k=>k.id===vt.kunde_id);
+    const vr = allMA.find(m=>m.id===vt.vertreter_id);
+    return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <span>${ku?.nachname||'?'} → ${vr?.vorname||'?'} ${vr?.nachname?.charAt(0)||''}.</span>
+      <span class="badge bg">✓ Erledigt</span></div>`;
+  }).join('');
+  document.getElementById('dispo-done').innerHTML = done||'<div class="tm">Noch keine abgeschlossenen Vertretungen</div>';
+}
+
+function getMatches(vt, kunde) {
+  return allMA.filter(m=>m.id!==vt.original_ma_id&&m.status==='aktiv').slice(0,3).map((m,i)=>{
+    // Check compatibility
+    const hasTierProblem = m.angst_tiere && (kunde?.haustier||'').length>0;
+    const hasAllergieProblem = m.allergie && kunde?.haustier && m.allergie.toLowerCase().includes(kunde.haustier.toLowerCase().split(',')[0]);
+    const isBuddy = allVT.some(v=>v.vertreter_id===m.id&&v.kunde_id===vt.kunde_id&&v.status==='erledigt');
+    let score = Math.max(50, 95 - i*14 - (hasTierProblem?20:0) - (hasAllergieProblem?25:0) + (isBuddy?5:0));
+    const tags = [
+      isBuddy?'<span class="tag" style="color:var(--accent);border-color:rgba(0,229,160,.2);">⭐ Buddy</span>':'',
+      m.mobilitaet?`<span class="tag">${m.mobilitaet}</span>`:'',
+      hasTierProblem?'<span class="tag" style="color:var(--danger);">⚠ Angst vor Tieren</span>':'',
+      hasAllergieProblem?'<span class="tag" style="color:var(--danger);">⚠ Allergie-Konflikt</span>':''
+    ].filter(Boolean).join('');
+    return { id:m.id, name:`${m.vorname} ${m.nachname}`, score,
+      details:`${m.stadtteil||''} · ${m.verfuegbarkeit||'Verfügbar'} · ${m.mobilitaet||''}`, tags };
+  });
+}
+
+async function confirmMatch(vtId, maId, maName) {
+  await db.from('vertretungen').update({status:'erledigt',vertreter_id:maId}).eq('id',vtId);
+  const ma = allMA.find(m=>m.id===maId);
+  if (ma) await db.from('mitarbeiter').update({vertretungen:(ma.vertretungen||0)+1}).eq('id',maId);
+  toast(`✅ ${maName} eingesetzt · Bitte in AFH-Software nachtragen`, 'success');
+  await loadAll();
+}
+
+// ═══ PERFORMANCE ═══════════════════════════════════════
+function renderPerformance() {
+  const sorted = [...allMA].sort((a,b)=>(b.vertretungen||0)-(a.vertretungen||0));
+  const top = sorted[0];
+  document.getElementById('perf-top').innerHTML = top&&(top.vertretungen||0)>0
+    ? `<div class="alert al-s"><span>🏆</span><div class="al-txt"><strong>Bonus-Kandidat: ${top.vorname} ${top.nachname}</strong>${top.vertretungen} Vertretungen</div></div>` : '';
+  const tbl = sorted.map(ma=>{
+    const vt=ma.vertretungen||0, kr=ma.kranktage||0;
+    const sc = kr>7?'br':kr>4?'bo':'bg';
+    const label = kr>7?'⚠ Risiko':kr>4?'Beobachten':'Gut';
+    return `<tr><td class="fw7">${ma.vorname} ${ma.nachname}</td><td style="color:var(--accent);font-weight:700;">${vt}</td>
+      <td ${kr>7?'style="color:var(--danger);font-weight:700;"':''}>${kr}</td>
+      <td>${vt>=5?'<span class="badge bg">+Bonus</span>':'–'}</td>
+      <td><span class="badge ${sc}">${label}</span></td></tr>`;
+  }).join('');
+  document.getElementById('perf-table').innerHTML = tbl||'<tr><td colspan="5" class="tm">Keine Daten</td></tr>';
+  const risiko = allMA.filter(m=>(m.kranktage||0)>7);
+  document.getElementById('perf-muster').innerHTML = risiko.length>0
+    ? risiko.map(m=>`<div class="alert al-w"><span>🔍</span><div class="al-txt"><strong>${m.vorname} ${m.nachname}: ${m.kranktage} Kranktage</strong>Gespräch empfohlen</div></div>`).join('')
+    : '<div class="alert al-s"><span>✅</span><div class="al-txt fw7">Keine auffälligen Muster</div></div>';
+}
+
+// ═══ KAPAZITÄT ═════════════════════════════════════════
+function renderKapazitaet() {
+  const aktKU = allKU.filter(k=>k.status==='aktiv').length;
+  const aktMA = allMA.filter(m=>m.status==='aktiv').length;
+  const pct = aktMA>0 ? Math.round(aktKU/(aktMA*5)*100) : 0;
+  let alerts = pct>85
+    ? `<div class="alert al-w"><span>🔮</span><div class="al-txt"><strong>Kapazitätswarnung: ${pct}% Auslastung</strong>Neue Mitarbeiter einplanen</div></div>`
+    : `<div class="alert al-s"><span>✅</span><div class="al-txt fw7">Kapazität OK · ${pct}% Auslastung</div></div>`;
+  document.getElementById('kap-alerts').innerHTML = alerts;
+
+  const bars = allMA.filter(m=>m.status==='aktiv').map(ma=>{
+    const kc = allKU.filter(k=>k.mitarbeiter_id===ma.id).length;
+    const p = Math.min(100,kc*20);
+    return `<div style="margin-bottom:10px;">
+      <div class="fb mb4"><span class="fw7" style="font-size:12px;">${ma.vorname} ${ma.nachname}</span><span class="tm">${p}%</span></div>
+      <div class="pbar"><div class="pfill ${p>90?'pr':p>70?'po':'pg'}" style="width:${p}%"></div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('kap-bars').innerHTML = bars||'<div class="tm">Keine Mitarbeiter</div>';
+
+  const tbl = ['Mai','Jun','Jul'].map((m,i)=>{
+    const proj = aktKU+(i+1)*3;
+    const pp = aktMA>0?Math.round(proj/(aktMA*5)*100):0;
+    const sc = pp>100?'br':pp>90?'bo':'bg';
+    return `<tr><td class="fw7">${m}</td><td>${proj}</td><td>${pp}%</td><td><span class="badge ${sc}">${pp>100?'Überlastet':pp>90?'Grenze nah':'OK'}</span></td></tr>`;
+  }).join('');
+  document.getElementById('kap-table').innerHTML = tbl;
+
+  // Feiertage Hessen
+  const now = new Date();
+  const twoMonths = new Date(now.getTime()+60*24*60*60*1000);
+  const upcoming = HESSEN_FEIERTAGE.filter(d=>{ const dt=new Date(d); return dt>now&&dt<twoMonths; });
+  const feierHtml = upcoming.length>0
+    ? upcoming.map(d=>`<div class="alert al-i"><span>📅</span><div class="al-txt"><strong>Feiertag Hessen: ${new Date(d).toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})}</strong>2 Monate vorher: Mitarbeiter-Kapazität prüfen</div></div>`).join('')
+    : '<div class="tm">Keine Feiertage in den nächsten 2 Monaten</div>';
+  document.getElementById('kap-feier').innerHTML = feierHtml;
+}
+
+// ═══ MARKETING ═════════════════════════════════════════
+function renderMarketing() {
+  const hMap = {};
+  allKU.forEach(k=>{ const h=k.herkunft||'Sonstiges'; hMap[h]=(hMap[h]||0)+1; });
+  const total = allKU.length||1;
+  const sorted = Object.entries(hMap).sort((a,b)=>b[1]-a[1]);
+  const stats = sorted.slice(0,4).map(([h,c],i)=>`
+    <div class="stat ${['g','b','o','r'][i]||'g'}">
+      <div class="stat-v" style="color:var(--${['accent','blue','warn','danger'][i]})">${Math.round(c/total*100)}%</div>
+      <div class="stat-l">${h}</div><div class="stat-s">${c} Kunden</div>
+    </div>`).join('');
+  document.getElementById('mkt-stats').innerHTML = stats;
+  document.getElementById('mkt-table').innerHTML = sorted.map(([h,c])=>`<tr><td class="fw7">${h}</td><td>${c}</td><td>${Math.round(c/total*100)}%</td></tr>`).join('');
+}
+
+// ═══ WOCHENPLAN ════════════════════════════════════════
+function renderWochenplan() {
+  const now = new Date();
+  const mon = new Date(now);
+  mon.setDate(now.getDate()-now.getDay()+1+weekOffset*7);
+  const days = Array.from({length:5},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+  document.getElementById('wp-week').textContent = `${mon.toLocaleDateString('de-DE',{day:'numeric',month:'long'})} – ${days[4].toLocaleDateString('de-DE',{day:'numeric',month:'long',year:'numeric'})}`;
+  const activeMAs = allMA.filter(m=>m.status==='aktiv').slice(0,6);
+  let html = '<div class="wg"><div class="wh">MA</div>';
+  days.forEach(d=>html+=`<div class="wh">${['Mo','Di','Mi','Do','Fr'][d.getDay()-1]} ${d.getDate()}.${d.getMonth()+1}.</div>`);
+  activeMAs.forEach(ma=>{
+    html+=`<div class="wl">${ma.vorname} ${ma.nachname.charAt(0)}.</div>`;
+    days.forEach(d=>{
+      const kunden = allKU.filter(k=>k.mitarbeiter_id===ma.id).slice(0,2);
+      const hasVT = allVT.some(v=>v.original_ma_id===ma.id&&v.status==='offen'&&new Date(v.datum).toDateString()===d.toDateString());
+      html+=`<div class="wc">`;
+      if (hasVT) html+=`<div class="we sick">Ausfall</div>`;
+      kunden.forEach(k=>html+=`<div class="we ${hasVT?'sick':''}">${k.nachname} ${k.stunden_pro_woche||''}h</div>`);
+      html+=`</div>`;
+    });
+  });
+  html+='</div>';
+  document.getElementById('wp-grid').innerHTML = html;
+}
+function changeWeek(d) { weekOffset+=d; renderWochenplan(); }
+
+// ═══ WOCHENBERICHT ═════════════════════════════════════
+function generateReport() {
+  const aktMA=allMA.filter(m=>m.status==='aktiv').length;
+  const aktKU=allKU.filter(k=>k.status==='aktiv').length;
+  const top=[...allMA].sort((a,b)=>(b.vertretungen||0)-(a.vertretungen||0))[0];
+  const risiko=allMA.filter(m=>(m.kranktage||0)>7);
+  const html=`<div class="card-title">Vorschau Wochenbericht</div>
+    <div style="font-family:'DM Mono',monospace;font-size:12px;line-height:2;">
+      <div style="color:var(--accent);font-weight:700;margin-bottom:8px;">AFH Frankfurt · Wochenbericht</div>
+      <div>📊 Kunden: ${aktKU} · MA: ${aktMA}</div>
+      ${top?(top.vertretungen||0)>0?`<div>🏆 Top Vertretungen: ${top.vorname} ${top.nachname} (${top.vertretungen}×)</div>`:'':''}
+      <div>➕ EG Pipeline: ${allEG.filter(e=>e.status==='offen').length} offen</div>
+      <div>🔄 Offene Vertretungen: ${allVT.filter(v=>v.status==='offen').length}</div>
+      ${risiko.length>0?`<div style="color:var(--warn);">⚠ Krankmuster: ${risiko.map(m=>m.vorname+' '+m.nachname).join(', ')}</div>`:''}
+      <div style="color:var(--accent);margin-top:8px;">✓ Bereit zum Versand an ${document.getElementById('report-email').value}</div>
+    </div>`;
+  document.getElementById('report-preview').innerHTML=html;
+  document.getElementById('report-preview').style.display='block';
+  toast('Bericht generiert ✓','success');
+}
+
+// ═══ KARTE ═════════════════════════════════════════════
+function initMap() {
+  if (mapInstance) return;
+  const el = document.getElementById('map');
+  if (!el || !el.offsetParent) return;
+  mapInstance = L.map('map',{center:[50.1109,8.6821],zoom:13});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19}).addTo(mapInstance);
+  buildMapFilters();
+  renderMapMarkers();
+}
+
+function buildMapFilters() {
+  const container = document.getElementById('emp-filters');
+  container.innerHTML = '';
+  allMA.forEach((ma,i)=>{
+    const color = COLORS[i%COLORS.length];
+    activeFilters.add(ma.id);
+    const div = document.createElement('div');
+    div.className = 'emp-filter';
+    div.innerHTML = `<div class="edot" style="background:${color}"></div>
+      <span style="flex:1;font-size:12px;">${ma.vorname} ${ma.nachname}</span>
+      <span class="tm">${allKU.filter(k=>k.mitarbeiter_id===ma.id).length}K</span>
+      <input type="checkbox" checked onchange="toggleFilter('${ma.id}',this.checked)" style="accent-color:${color}">`;
+    container.appendChild(div);
+  });
+  document.getElementById('map-ma-count').textContent = allMA.length;
+  document.getElementById('map-ku-count').textContent = allKU.length;
+  document.getElementById('cluster-count').textContent = Math.max(0,Math.floor(allKU.length/10))+' erkannt';
+}
+
+function toggleFilter(id,on) { if(on) activeFilters.add(id); else activeFilters.delete(id); renderMapMarkers(); }
+function toggleMapView() { toast('Weitere Ansichten kommen in nächster Version','success'); }
+
+function renderMapMarkers() {
+  Object.values(empMarkers).forEach(m=>mapInstance.removeLayer(m));
+  custMarkers.forEach(m=>mapInstance.removeLayer(m));
+  empMarkers={}; custMarkers=[];
+  const C = {lat:50.1109,lng:8.6821};
+
+  allMA.forEach((ma,i)=>{
+    if (!activeFilters.has(ma.id)) return;
+    const color = COLORS[i%COLORS.length];
+    // Use stored lat/lng if available, else scatter
+    const lat = ma.lat || C.lat+(i*0.008-0.02)+Math.sin(i)*0.01;
+    const lng = ma.lng || C.lng+(i*0.012-0.03)+Math.cos(i)*0.01;
+    const init = ((ma.vorname||'').charAt(0)+(ma.nachname||'').charAt(0)).toUpperCase();
+    const icon = L.divIcon({
+      html:`<div style="width:32px;height:32px;border-radius:50%;background:${color};border:3px solid #0a0a0f;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#000;box-shadow:0 2px 8px rgba(0,0,0,.5);">${init}</div>`,
+      className:'',iconSize:[32,32],iconAnchor:[16,16]
+    });
+    const m = L.marker([lat,lng],{icon}).addTo(mapInstance);
+    m.on('click',()=>showMapInfo(ma.vorname+' '+ma.nachname,ma.adresse||ma.stadtteil||'',`<div style="color:${color};font-weight:700;">${allKU.filter(k=>k.mitarbeiter_id===ma.id).length} Kunden</div><div style="color:var(--muted);margin-top:3px;">${ma.mobilitaet||''} · ${ma.einsatzgebiete||''}</div>`));
+    empMarkers[ma.id]=m;
+  });
+
+  allKU.forEach((ku,i)=>{
+    const maIdx = allMA.findIndex(m=>m.id===ku.mitarbeiter_id);
+    if (maIdx===-1||!activeFilters.has(ku.mitarbeiter_id)) return;
+    const color = COLORS[maIdx%COLORS.length];
+    const lat = ku.lat || C.lat+(i*0.005-0.04)+Math.sin(i*1.3)*0.015;
+    const lng = ku.lng || C.lng+(i*0.007-0.05)+Math.cos(i*1.3)*0.015;
+    const icon = L.divIcon({
+      html:`<div style="width:14px;height:14px;border-radius:3px;background:${color};opacity:.85;border:2px solid #0a0a0f;"></div>`,
+      className:'',iconSize:[14,14],iconAnchor:[7,7]
+    });
+    const m = L.marker([lat,lng],{icon}).addTo(mapInstance);
+    const ma = allMA.find(x=>x.id===ku.mitarbeiter_id);
+    m.on('click',()=>showMapInfo(ku.vorname+' '+ku.nachname,ku.stadtteil||'',`<div>Betreut: <span style="color:${color};font-weight:700;">${ma?.vorname||'?'} ${ma?.nachname||'?'}</span></div><div style="color:var(--muted);">${ku.stunden_pro_woche||'–'}h/Wo</div>`));
+    custMarkers.push(m);
+  });
+}
+
+function showMapInfo(title,sub,body) {
+  document.getElementById('mi-title').textContent=title;
+  document.getElementById('mi-sub').textContent=sub;
+  document.getElementById('mi-body').innerHTML=body;
+  document.getElementById('map-info').classList.add('show');
+}
+
+// ═══ GOOGLE MAPS RADIUS ════════════════════════════════
+let adresseDebounce = null;
+function onAdresseInput(val) {
+  clearTimeout(adresseDebounce);
+  if (val.length < 10) return;
+  adresseDebounce = setTimeout(() => calcRadius(val), 1500);
+}
+
+function onMobChange() {
+  const adresse = document.getElementById('ma-adresse').value;
+  if (adresse.length > 10) calcRadius(adresse);
+}
+
+async function calcRadius(adresse) {
+  const mob = document.getElementById('ma-mob').value;
+  const loading = document.getElementById('radius-loading');
+  const result = document.getElementById('radius-result');
+  loading.style.display = 'flex';
+  result.style.display = 'none';
+
+  try {
+    // Geocode the address
+    const geoResp = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(adresse)}&key=${GMAPS_KEY}`);
+    const geoData = await geoResp.json();
+    if (!geoData.results||geoData.results.length===0) { loading.style.display='none'; return; }
+    const loc = geoData.results[0].geometry.location;
+
+    // Frankfurt PLZ list for distance matrix
+    const frankfurtPLZ = [
+      '60306 Frankfurt','60308 Frankfurt','60311 Frankfurt','60313 Frankfurt','60314 Frankfurt',
+      '60316 Frankfurt','60318 Frankfurt','60320 Frankfurt','60322 Frankfurt','60323 Frankfurt',
+      '60325 Frankfurt','60326 Frankfurt','60327 Frankfurt','60329 Frankfurt','60385 Frankfurt',
+      '60386 Frankfurt','60388 Frankfurt','60389 Frankfurt','60431 Frankfurt','60433 Frankfurt',
+      '60435 Frankfurt','60437 Frankfurt','60438 Frankfurt','60439 Frankfurt','60486 Frankfurt',
+      '60487 Frankfurt','60488 Frankfurt','60489 Frankfurt','60528 Frankfurt','60529 Frankfurt',
+      '60549 Frankfurt','60594 Frankfurt','60596 Frankfurt','60598 Frankfurt','60599 Frankfurt',
+    ];
+
+    const mode = mob==='ÖPNV' ? 'transit' : 'driving';
+    const destStr = frankfurtPLZ.slice(0,25).join('|');
+    const dmResp = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${loc.lat},${loc.lng}&destinations=${encodeURIComponent(destStr)}&mode=${mode}&language=de&key=${GMAPS_KEY}`);
+    const dmData = await dmResp.json();
+
+    const erreichbar = [];
+    if (dmData.rows&&dmData.rows[0]) {
+      dmData.rows[0].elements.forEach((el,i)=>{
+        if (el.status==='OK'&&el.duration&&el.duration.value<=30*60) {
+          erreichbar.push(frankfurtPLZ[i].split(' ')[0]);
+        }
+      });
+    }
+
+    // Store lat/lng for map
+    document.getElementById('ma-adresse').dataset.lat = loc.lat;
+    document.getElementById('ma-adresse').dataset.lng = loc.lng;
+
+    if (erreichbar.length>0) {
+      document.getElementById('ma-gebiete').value = erreichbar.join(', ');
+      result.innerHTML = `✓ <strong>${erreichbar.length} PLZ</strong> in 30 Min erreichbar (${mob}): ${erreichbar.join(', ')}`;
+      result.style.display = 'block';
+    } else {
+      result.innerHTML = 'Keine PLZ in 30 Min Radius gefunden. Bitte manuell eingeben.';
+      result.style.display = 'block';
+    }
+  } catch(e) {
+    result.innerHTML = 'Radius-Berechnung fehlgeschlagen – bitte manuell eingeben.';
+    result.style.display = 'block';
+  }
+  loading.style.display = 'none';
+}
+
+// ═══ PROBEZEIT AUTO ════════════════════════════════════
+function autoProbezeit() {
+  const ein = document.getElementById('ma-ein').value;
+  if (!ein) return;
+  const d = new Date(ein);
+  d.setMonth(d.getMonth()+6);
+  document.getElementById('ma-probe').value = d.toISOString().split('T')[0];
+  toast('Probezeit-Ende automatisch auf +6 Monate gesetzt ✓','success');
+}
+
+// ═══ SAVE FUNCTIONS ════════════════════════════════════
+async function saveMitarbeiter() {
+  const adresseEl = document.getElementById('ma-adresse');
+  const data = {
+    vorname:v('ma-vn'), nachname:v('ma-nn'), telefon:v('ma-tel'), email:v('ma-email'),
+    adresse:v('ma-adresse'), stadtteil:v('ma-adresse').split(',')[1]?.trim()||'',
+    mobilitaet:v('ma-mob'), verfuegbarkeit:v('ma-verf'), einsatzgebiete:v('ma-gebiete'),
+    grundreinigung:cb('ma-grundreinigung'), angst_tiere:cb('ma-angst-tiere'),
+    raucher:cb('ma-raucher'), rollstuhl_ok:cb('ma-rollstuhl'), allergie:v('ma-allergie'),
+    eingestellt_am:v('ma-ein')||null, probezeit_bis:v('ma-probe')||null,
+    lat:parseFloat(adresseEl.dataset.lat)||null, lng:parseFloat(adresseEl.dataset.lng)||null,
+    status:'aktiv', kranktage:0, vertretungen:0
+  };
+  if (!data.vorname||!data.nachname) { toast('Vor- und Nachname erforderlich','error'); return; }
+  const {error} = await db.from('mitarbeiter').insert(data);
+  if (error) { toast('Fehler: '+error.message,'error'); return; }
+  closeModal('m-mitarbeiter');
+  toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
+  await loadAll();
+}
+
+async function saveKunde() {
+  const data = {
+    vorname:v('ku-vn'), nachname:v('ku-nn'), telefon:v('ku-tel'), plz:v('ku-plz'),
+    stadtteil:v('ku-st'), stunden_pro_woche:parseFloat(v('ku-std'))||null,
+    mitarbeiter_id:v('ku-ma')||null, herkunft:v('ku-herkunft'),
+    raucher_hh:cb('ku-raucher'), haustier:[cb('ku-hund')?'Hund':'',cb('ku-katze')?'Katze':''].filter(Boolean).join(', '),
+    barrierefrei:cb('ku-barrier'), rollstuhl:cb('ku-rstuhl'),
+    hausarzt:v('ku-hausarzt'), notfallkontakt:v('ku-notfall'),
+    status:'neu', aufgenommen_am:new Date().toISOString().split('T')[0]
+  };
+  if (!data.vorname||!data.nachname) { toast('Vor- und Nachname erforderlich','error'); return; }
+  const {error} = await db.from('kunden').insert(data);
+  if (error) { toast('Fehler: '+error.message,'error'); return; }
+  closeModal('m-kunde'); toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
+  await loadAll();
+}
+
+async function saveEG() {
+  const data = {
+    vorname:v('eg-vn'), nachname:v('eg-nn'), telefon:v('eg-tel'), plz:v('eg-plz'),
+    stadtteil:v('eg-st'), stunden_geschaetzt:parseFloat(v('eg-std'))||null,
+    pflegegrad:v('eg-pg')||null, pflegekasse:v('eg-kasse')||null,
+    privat:cb('eg-privat'), beihilfe:cb('eg-beihilfe'),
+    bedarf:v('eg-bedarf'), herkunft:v('eg-herkunft'),
+    termin_datum:v('eg-termin')||null, pflegedienst_bedarf:cb('eg-pflege'),
+    kooperation:v('eg-koop'), hausarzt:v('eg-hausarzt'),
+    notizen:v('eg-notizen'), status:'offen'
+  };
+  if (!data.vorname||!data.nachname) { toast('Vor- und Nachname erforderlich','error'); return; }
+  const {error} = await db.from('erstgespraeche').insert(data);
+  if (error) { toast('Fehler: '+error.message,'error'); return; }
+  closeModal('m-eg'); toast(`${data.vorname} ${data.nachname} in Pipeline ✓`,'success');
+  await loadAll();
+}
+
+async function saveKrankmeldung() {
+  const maId = v('km-ma');
+  if (!maId) { toast('Bitte Mitarbeiter wählen','error'); return; }
+  const ma = allMA.find(m=>m.id===maId);
+  const kunden = allKU.filter(k=>k.mitarbeiter_id===maId);
+  for (const ku of kunden) {
+    await db.from('vertretungen').insert({datum:v('km-von'),kunde_id:ku.id,original_ma_id:maId,grund:v('km-grund'),status:'offen'});
+  }
+  const tage = Math.max(1,Math.round((new Date(v('km-bis'))-new Date(v('km-von')))/(86400000))+1);
+  await db.from('mitarbeiter').update({kranktage:(ma.kranktage||0)+tage}).eq('id',maId);
+  closeModal('m-krankmeldung');
+  toast(`Krankmeldung gespeichert · ${kunden.length} Vertretungen angelegt`,'success');
+  await loadAll(); go('dispo');
+}
+
+async function aufnehmenEG(id) {
+  await db.from('erstgespraeche').update({status:'aufgenommen'}).eq('id',id);
+  toast('Als aufgenommen markiert ✓','success'); await loadAll();
+}
+
+// ═══ HELPERS ═══════════════════════════════════════════
+function v(id) { const el=document.getElementById(id); return el?el.value.trim():''; }
+function cb(id) { const el=document.getElementById(id); return el?el.checked:false; }
+
+function populateSelects() {
+  ['km-ma','ku-ma'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">– wählen –</option>';
+    allMA.forEach(ma=>{ const o=document.createElement('option'); o.value=ma.id; o.textContent=`${ma.vorname} ${ma.nachname}`; if(ma.id===cur) o.selected=true; sel.appendChild(o); });
+  });
+}
+
+function timeSince(d) {
+  const diff=Math.floor((new Date()-new Date(d))/60000);
+  if(diff<60) return 'Heute'; if(diff<1440) return 'Heute'; if(diff<2880) return 'Gestern';
+  return Math.floor(diff/1440)+'d';
+}
+
+function toast(msg,type='success') {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+function go(page) {
+  const locked=['mitarbeiter','performance','kapazitaet','marketing','wochenbericht'];
+  if(currentUser==='buero'&&locked.includes(page)){showLocked();return;}
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('page-'+page);
+  if(pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-item:not(.locked)').forEach(n=>n.classList.toggle('active',n.getAttribute('onclick')?.includes("'"+page+"'")));
+  if(page==='karte'){
+    if(!mapInstance) initMap();
+    else setTimeout(()=>mapInstance.invalidateSize(),100);
+  }
+}
+
+function showLocked() {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  let lp=document.getElementById('page-locked');
+  if(!lp){lp=document.createElement('div');lp.id='page-locked';lp.className='page active';lp.innerHTML='<div class="header"><div><div class="hdr-t">Kein Zugriff</div></div></div><div class="content"><div class="locked-pg"><div style="font-size:44px;opacity:.3;">🔒</div><div style="font-size:17px;font-weight:700;color:var(--muted);">Nur für Admin</div></div></div>';document.querySelector('.main').appendChild(lp);}
+  else lp.classList.add('active');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('btn-login').disabled)doLogin();});
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+</script>
+</body>
+</html>
