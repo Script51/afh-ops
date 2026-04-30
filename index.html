@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAz3Lc2AM2KPx6mST6WEH6ttduxyMTHWA&libraries=places,geometry&callback=gmapsReady"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAz3Lc2AM2KPx6mST6WEH6ttduxyMTHWA&libraries=places,geometry&callback=onGmapsLoaded"></script>
 <style>
 :root {
   --bg:#0a0a0f;--surface:#111118;--s2:#1a1a24;--s3:#222230;
@@ -744,14 +744,14 @@ let currentUser = null;
 let allMA = [], allKU = [], allEG = [], allVT = [];
 let mapInstance = null, activeFilters = new Set(), empMarkers = {}, custMarkers = [];
 let weekOffset = 0;
-let gmapsReady = false;
+let gmapsLoaded = false;
 let adresseTimer = null;
 
 const PINS = { niklas:'1994', buero:'0000' };
 const COLORS = ['#00e5a0','#0099ff','#ff6b35','#cc44ff','#ffcc00','#ff4466','#00ccff','#88ff44'];
 
 // ═══ GOOGLE MAPS READY ═════════════════════════════════
-function gmapsReady() { gmapsReady = true; }
+function onGmapsLoaded() { gmapsLoaded = true; }
 
 // ═══ LOGIN ═════════════════════════════════════════════
 function selUser(u) {
