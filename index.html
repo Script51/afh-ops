@@ -706,9 +706,11 @@ tr:hover td{background:var(--s2);}
       </div>
 
       <!-- MA VORSCHLAG -->
-      <div id="eg-ma-suggestion" style="display:none;">
-        <div class="sdiv"><span>Passende Mitarbeiter (PLZ + Kapazität + Verfügbarkeit)</span></div>
-        <div id="eg-ma-list"></div>
+      <div id="eg-ma-suggestion">
+        <div class="sdiv"><span>Passende Mitarbeiter · PLZ eingeben für genaue Auswahl</span></div>
+        <div id="eg-ma-list">
+          <div class="alert al-i" style="font-size:12px;"><span>💡</span><div>PLZ oben eingeben → System zeigt passende Mitarbeiter mit freiem Termin</div></div>
+        </div>
         <input type="hidden" id="eg-ma-selected">
       </div>
 
@@ -732,12 +734,18 @@ tr:hover td{background:var(--s2);}
 
       <div id="eg-teil2-info" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
 
-      <div class="sdiv"><span>Wohnsituation</span></div>
-      <div class="fr3">
-        <div class="fg"><label class="fl">Wohnfläche</label><input type="text" class="fi" id="eg2-flaeche" placeholder="z.B. 60 m²"></div>
-        <div class="fg"><label class="fl">Stockwerk</label><input type="text" class="fi" id="eg2-stockwerk" placeholder="z.B. 2. OG"></div>
-        <div class="fg"><label class="fl">Aufzug</label>
-          <select class="fs" id="eg2-aufzug"><option value="">–</option><option>Ja</option><option>Nein</option></select></div>
+      <div class="sdiv"><span>Kooperationen & Zusatzleistungen</span></div>
+      <div class="fg"><label class="fl">Was wird benötigt / besprochen?</label>
+        <div class="cbg">
+          <label class="cbi"><input type="checkbox" id="eg2-mahlzeiten"> 🍽️ Mahlzeiten</label>
+          <label class="cbi"><input type="checkbox" id="eg2-hausnotruf"> 🚨 Hausnotruf</label>
+          <label class="cbi"><input type="checkbox" id="eg2-pflegedienst"> 🏥 Pflegedienst</label>
+          <label class="cbi"><input type="checkbox" id="eg2-37grad"> 💊 37,3 Gespräch (VP)</label>
+          <label class="cbi"><input type="checkbox" id="eg2-badumbau"> 🚿 Badumbau</label>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Sonstiges</label>
+        <input type="text" class="fi" id="eg2-sonstiges" placeholder="Weitere Bedarfe, Wünsche, Anmerkungen…">
       </div>
       <div class="fg"><label class="fl">Besonderheiten Wohnung</label>
         <div class="cbg">
@@ -1244,8 +1252,9 @@ function openEGNeu(){
   document.getElementById('eg-termin-datum').value='';
   document.getElementById('eg-termin-uhrzeit').value='';
   document.getElementById('eg-termin').value='';
-  document.getElementById('eg-ma-suggestion').style.display='none';
   document.getElementById('eg-ma-selected').value='';
+  // Show all MA immediately
+  suggestMA('');
   const errDiv=document.getElementById('eg-error');
   if(errDiv) errDiv.style.display='none';
   // Set dirty on any input change
@@ -1311,19 +1320,17 @@ function suggestMA(plz){
 
   const matches=allMA.filter(m=>{
     if(m.status!=='aktiv') return false;
+    if(!plz) return true; // show all if no PLZ
     const gebiete=(m.einsatzgebiete||m.plz||'').replace(/\s/g,'');
     return gebiete.includes(plz) || (m.plz||'').includes(plz);
   });
 
-  // Also include nearby MA if none found in exact PLZ
   const allCandidates = matches.length > 0 ? matches : allMA.filter(m=>m.status==='aktiv').slice(0,5);
 
   if(allCandidates.length===0){
-    document.getElementById('eg-ma-suggestion').style.display='none';
+    document.getElementById('eg-ma-list').innerHTML='<div class="tm">Keine aktiven Mitarbeiter gefunden</div>';
     return;
   }
-
-  document.getElementById('eg-ma-suggestion').style.display='block';
 
   const html=allCandidates.slice(0,4).map((ma,i)=>{
     const color=COLORS[allMA.indexOf(ma)%COLORS.length];
