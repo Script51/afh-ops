@@ -389,11 +389,29 @@ tr:hover td{background:var(--s2);}
       <div class="header">
         <div><div class="hdr-t">Wochenplan</div><div class="hdr-s" id="wp-week">–</div></div>
         <div class="fg-row">
+          <button class="btn btn-secondary btn-sm" id="wp-tab-plan" onclick="switchWPTab('plan')">📅 Wochenansicht</button>
+          <button class="btn btn-primary btn-sm" id="wp-tab-stamm" onclick="switchWPTab('stamm')">⚙️ Stammdaten pflegen</button>
           <button class="btn btn-secondary btn-sm" onclick="changeWeek(-1)">← Vorwoche</button>
           <button class="btn btn-secondary btn-sm" onclick="changeWeek(1)">Nächste →</button>
         </div>
       </div>
-      <div class="content"><div class="card"><div id="wp-grid"></div></div></div>
+      <div class="content">
+        <!-- WOCHENANSICHT -->
+        <div id="wp-view-plan">
+          <div class="card"><div id="wp-grid"></div></div>
+        </div>
+        <!-- STAMMDATEN -->
+        <div id="wp-view-stamm" style="display:none;">
+          <div class="alert al-i mb4"><span>💡</span><div class="al-txt"><strong>Hier pflegst du die festen Wochenpläne deiner Mitarbeiter</strong>Diese Daten werden für die Termin-Berechnung beim Erstgespräch genutzt.</div></div>
+          <div class="fg-row mb4">
+            <select class="fs" id="wp-ma-select" onchange="renderWPStamm()" style="width:250px;">
+              <option value="">– Mitarbeiter wählen –</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openModal('m-wp-eintrag')">+ Eintrag hinzufügen</button>
+          </div>
+          <div class="card"><div id="wp-stamm-grid"></div></div>
+        </div>
+      </div>
     </div>
 
     <!-- KUNDEN -->
@@ -798,6 +816,62 @@ tr:hover td{background:var(--s2);}
   </div>
 </div>
 
+<!-- WOCHENPLAN EINTRAG -->
+<div class="modal-overlay" id="m-wp-eintrag">
+  <div class="modal" style="width:480px;">
+    <div class="modal-t">📅 Wochenplan-Eintrag <span class="modal-x" onclick="closeModal('m-wp-eintrag')">×</span></div>
+    <div class="fg"><label class="fl">Mitarbeiter</label>
+      <select class="fs" id="wp-ma-modal"><option value="">– wählen –</option></select></div>
+    <div class="fg"><label class="fl">Kunde</label>
+      <select class="fs" id="wp-ku-modal"><option value="">– wählen –</option></select></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Wochentag</label>
+        <select class="fs" id="wp-tag">
+          <option value="1">Montag</option><option value="2">Dienstag</option>
+          <option value="3">Mittwoch</option><option value="4">Donnerstag</option>
+          <option value="5">Freitag</option><option value="6">Samstag</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Rhythmus</label>
+        <select class="fs" id="wp-rhythmus">
+          <option value="wöchentlich">Wöchentlich</option>
+          <option value="14-tägig">Alle 14 Tage</option>
+          <option value="einmalig">Einmalig</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Von (Uhrzeit)</label>
+        <select class="fs" id="wp-von">
+          <option>06:00</option><option>06:30</option><option>07:00</option><option>07:30</option>
+          <option selected>08:00</option><option>08:30</option><option>09:00</option><option>09:30</option>
+          <option>10:00</option><option>10:30</option><option>11:00</option><option>11:30</option>
+          <option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option>
+          <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
+          <option>16:00</option><option>16:30</option><option>17:00</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Bis (Uhrzeit)</label>
+        <select class="fs" id="wp-bis">
+          <option>06:30</option><option>07:00</option><option>07:30</option><option>08:00</option>
+          <option>08:30</option><option>09:00</option><option>09:30</option>
+          <option>10:00</option><option selected>10:00</option><option>10:30</option><option>11:00</option><option>11:30</option>
+          <option>12:00</option><option>12:30</option><option>13:00</option><option>13:30</option>
+          <option>14:00</option><option>14:30</option><option>15:00</option><option>15:30</option>
+          <option>16:00</option><option>16:30</option><option>17:00</option><option>17:30</option><option>18:00</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Notiz (optional)</label>
+      <input type="text" class="fi" id="wp-notiz" placeholder="z.B. Schlüssel beim Nachbarn">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-wp-eintrag')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveWPEintrag()">Speichern ✓</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -813,7 +887,7 @@ const PINS = { niklas:'1994', buero:'0000' };
 
 // ═══ STATE ══════════════════════════════════
 let currentUser = null;
-let allMA=[], allKU=[], allEG=[], allVT=[];
+let allMA=[], allKU=[], allEG=[], allVT=[], allWP=[];
 let allQueueTasks = JSON.parse(localStorage.getItem('afh_queue')||'[]');
 let mapInstance=null, activeFilters=new Set(), empMarkers={}, custMarkers=[];
 let weekOffset=0;
@@ -912,19 +986,20 @@ function doLogout(){
 
 // ═══ DATA ═══════════════════════════════════
 async function loadAll(){
-  const [ma,ku,eg,vt]=await Promise.all([
+  const [ma,ku,eg,vt,wp]=await Promise.all([
     db.from('mitarbeiter').select('*').order('nachname'),
     db.from('kunden').select('*').order('nachname'),
     db.from('erstgespraeche').select('*').order('created_at',{ascending:false}),
     db.from('vertretungen').select('*').order('datum',{ascending:false}),
+    db.from('wochenplan').select('*').order('wochentag'),
   ]);
-  allMA=ma.data||[];allKU=ku.data||[];allEG=eg.data||[];allVT=vt.data||[];
+  allMA=ma.data||[];allKU=ku.data||[];allEG=eg.data||[];allVT=vt.data||[];allWP=wp.data||[];
   renderAll();
 }
 function renderAll(){
   renderDashboard();renderKunden();renderMA();renderEG();
   renderDispo();renderPerf();renderKap();renderMkt();
-  renderWochenplan();populateSelects();renderQueue();
+  renderWochenplan();renderWochenplanEchte();populateSelects();renderQueue();
   if(mapInstance)renderMap();
 }
 
@@ -1284,7 +1359,13 @@ function suggestMA(plz){
           ${plzMatch?'<span class="tag" style="color:var(--blue);">PLZ ✓</span>':''}
         </div>
         <div class="tm">${ma.mobilitaet||''} · ${kc}/${maxKunden} Kunden · Auslastung <span style="color:${kapColor};font-weight:700;">${kapPct}%</span></div>
-        <div class="tm" style="margin-top:3px;">📅 Frühester Termin: <span style="color:var(--accent);font-weight:700;">${nextFreiStr}</span></div>
+        <div class="tm ma-termin-info" style="margin-top:3px;" id="termin-${ma.id}">
+          ${(()=>{
+            const res=berechneFreienTermin(ma.id, v('eg-plz'));
+            if(!res||res.length===0) return '📅 Kein Wochenplan hinterlegt';
+            return res.slice(0,2).map(r=>`📅 ${r.text}`).join(' · ');
+          })()}
+        </div>
         <div style="margin-top:4px;">
           ${ma.grundreinigung?'<span class="tag">Grundreinigung ✓</span>':''}
           ${ma.angst_tiere?'<span class="tag" style="color:var(--warn);">Angst Tiere</span>':''}
@@ -1392,29 +1473,37 @@ async function saveEGTeil2(){
   const eg=allEG.find(e=>e.id===currentEGId);
   if(!eg){toast('EG nicht gefunden','error');return;}
 
-  // Update EG
   await db.from('erstgespraeche').update({
     status:'aufgenommen',
-    notizen:(eg.notizen||'')+'\n--- Vor-Ort ---\n'+v('eg2-notizen')
+    notizen:(eg.notizen||'')+'\n--- Vor-Ort ---\n'+(v('eg2-notizen')||'')
   }).eq('id',currentEGId);
 
-  // Kunde anlegen
+  const ma=allMA.find(m=>m.id===eg.mitarbeiter_id);
   const kuData={
-    vorname:eg.vorname,nachname:eg.nachname,telefon:eg.telefon,
-    plz:eg.plz,stadtteil:eg.stadtteil,
+    vorname:eg.vorname, nachname:eg.nachname, telefon:eg.telefon||null,
+    plz:eg.plz||null, stadtteil:eg.stadtteil||null,
     stunden_pro_woche:parseFloat(v('eg2-std'))||eg.stunden_geschaetzt||null,
     mitarbeiter_id:eg.mitarbeiter_id||null,
-    herkunft:eg.herkunft,
+    herkunft:eg.herkunft||null,
     raucher_hh:cb('eg2-raucher'),
-    haustier:[cb('eg2-hund')?'Hund':'',cb('eg2-katze')?'Katze':''].filter(Boolean).join(', '),
-    barrierefrei:cb('eg2-barrier'),rollstuhl:cb('eg2-rstuhl'),
-    hausarzt:eg.hausarzt,
-    status:'neu',aufgenommen_am:new Date().toISOString().split('T')[0]
+    haustier:[cb('eg2-hund')?'Hund':'',cb('eg2-katze')?'Katze':''].filter(Boolean).join(', ')||null,
+    barrierefrei:cb('eg2-barrier'), rollstuhl:cb('eg2-rstuhl'),
+    hausarzt:eg.hausarzt||null,
+    status:'neu', aufgenommen_am:new Date().toISOString().split('T')[0]
   };
   const {error}=await db.from('kunden').insert(kuData);
-  if(error){toast('Fehler beim Kunden anlegen: '+error.message,'error');return;}
+  if(error){toast('Fehler: '+error.message,'error');return;}
 
-  toast(`${eg.vorname} ${eg.nachname} aufgenommen + Kunde angelegt ✓`,'success');
+  // Queue-Aufgabe
+  addQueueTask(
+    `AFH-Software: Neuen Kunden anlegen → ${eg.vorname} ${eg.nachname}` +
+    (eg.plz?` · PLZ ${eg.plz}`:'') +
+    (ma?` · Mitarbeiter: ${ma.vorname} ${ma.nachname}`:'') +
+    (kuData.stunden_pro_woche?` · ${kuData.stunden_pro_woche}h/Wo`:''),
+    'neukunde'
+  );
+
+  toast(`${eg.vorname} ${eg.nachname} aufgenommen ✓ · Queue-Aufgabe erstellt`,'success');
   closeModal('m-eg');
   await loadAll();
 }
@@ -1600,6 +1689,16 @@ function generateReport(){
   toast('Bericht generiert ✓','success');
 }
 
+// ═══ QUEUE HELPER ═══════════════════════════
+function addQueueTask(message, typ){
+  allQueueTasks.push({
+    id: Date.now().toString()+Math.random().toString(36).substr(2,5),
+    message, typ, erledigt: false,
+    created_at: new Date().toISOString()
+  });
+  saveQueueTasks();
+}
+
 // ═══ SAVE FUNCTIONS ═════════════════════════
 async function saveMitarbeiter(){
   const data={
@@ -1614,8 +1713,14 @@ async function saveMitarbeiter(){
   if(!data.vorname||!data.nachname){toast('Vor- und Nachname erforderlich','error');return;}
   const {error}=await db.from('mitarbeiter').insert(data);
   if(error){toast('Fehler: '+error.message,'error');return;}
+  addQueueTask(
+    `AFH-Software: Neuen Mitarbeiter anlegen → ${data.vorname} ${data.nachname}` +
+    (data.mobilitaet?` · ${data.mobilitaet}`:'') +
+    (data.eingestellt_am?` · Start: ${new Date(data.eingestellt_am).toLocaleDateString('de-DE')}`:''),
+    'mitarbeiter'
+  );
   closeModal('m-mitarbeiter');
-  toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
+  toast(`${data.vorname} ${data.nachname} angelegt ✓ · Queue-Aufgabe erstellt`,'success');
   await loadAll();
 }
 
@@ -1633,7 +1738,16 @@ async function saveKunde(){
   if(!data.vorname||!data.nachname){toast('Vor- und Nachname erforderlich','error');return;}
   const {error}=await db.from('kunden').insert(data);
   if(error){toast('Fehler: '+error.message,'error');return;}
-  closeModal('m-kunde');toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
+  const maKu=allMA.find(m=>m.id===data.mitarbeiter_id);
+  addQueueTask(
+    `AFH-Software: Kunden anlegen → ${data.vorname} ${data.nachname}` +
+    (data.plz?` · PLZ ${data.plz}`:'') +
+    (maKu?` · MA: ${maKu.vorname} ${maKu.nachname}`:'') +
+    (data.stunden_pro_woche?` · ${data.stunden_pro_woche}h/Wo`:''),
+    'neukunde'
+  );
+  closeModal('m-kunde');
+  toast(`${data.vorname} ${data.nachname} angelegt ✓ · Queue-Aufgabe erstellt`,'success');
   await loadAll();
 }
 
@@ -1647,8 +1761,16 @@ async function saveKrankmeldung(){
   }
   const tage=Math.max(1,Math.round((new Date(v('km-bis'))-new Date(v('km-von')))/86400000)+1);
   await db.from('mitarbeiter').update({kranktage:(ma.kranktage||0)+tage}).eq('id',maId);
+  kunden.forEach(ku=>{
+    addQueueTask(
+      `AFH-Software: Vertretung eintragen → ${ku.vorname} ${ku.nachname}` +
+      ` · ${v('km-von')} bis ${v('km-bis')}` +
+      ` · Grund: ${v('km-grund')}`,
+      'dispo'
+    );
+  });
   closeModal('m-krankmeldung');
-  toast(`Krankmeldung gespeichert · ${kunden.length} Vertretungen angelegt`,'success');
+  toast(`Krankmeldung gespeichert · ${kunden.length} Queue-Aufgaben erstellt`,'success');
   await loadAll();go('dispo');
 }
 
@@ -1772,8 +1894,203 @@ function showLocked(){
   if(!lp){lp=document.createElement('div');lp.id='page-locked';lp.className='page active';lp.innerHTML='<div class="header"><div><div class="hdr-t">Kein Zugriff</div></div></div><div class="content"><div class="locked-pg"><div style="font-size:44px;opacity:.3;">🔒</div><div style="font-size:17px;font-weight:700;color:var(--muted);">Nur für Admin</div></div></div>';document.querySelector('.main').appendChild(lp);}
   else lp.classList.add('active');
 }
-function openModal(id){document.getElementById(id).classList.add('open');}
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='m-wp-eintrag') populateWPSelects();
+}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+// ═══ WOCHENPLAN STAMMDATEN ══════════════════
+function switchWPTab(tab){
+  document.getElementById('wp-view-plan').style.display = tab==='plan'?'block':'none';
+  document.getElementById('wp-view-stamm').style.display = tab==='stamm'?'block':'none';
+  document.getElementById('wp-tab-plan').className = tab==='plan'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  document.getElementById('wp-tab-stamm').className = tab==='stamm'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  if(tab==='stamm') populateWPSelects();
+}
+
+function populateWPSelects(){
+  const maSelect = document.getElementById('wp-ma-select');
+  const maCur = maSelect?.value;
+  if(maSelect){
+    maSelect.innerHTML='<option value="">– Mitarbeiter wählen –</option>';
+    allMA.forEach(ma=>{
+      const o=document.createElement('option');
+      o.value=ma.id; o.textContent=`${ma.vorname} ${ma.nachname}`;
+      if(ma.id===maCur) o.selected=true;
+      maSelect.appendChild(o);
+    });
+  }
+  const maModal = document.getElementById('wp-ma-modal');
+  if(maModal){
+    maModal.innerHTML='<option value="">– wählen –</option>';
+    allMA.forEach(ma=>{
+      const o=document.createElement('option');
+      o.value=ma.id; o.textContent=`${ma.vorname} ${ma.nachname}`;
+      maModal.appendChild(o);
+    });
+  }
+  const kuModal = document.getElementById('wp-ku-modal');
+  if(kuModal){
+    kuModal.innerHTML='<option value="">– wählen –</option>';
+    allKU.forEach(ku=>{
+      const o=document.createElement('option');
+      o.value=ku.id; o.textContent=`${ku.nachname}, ${ku.vorname} (${ku.plz||''})`;
+      kuModal.appendChild(o);
+    });
+  }
+}
+
+function renderWPStamm(){
+  const maId = document.getElementById('wp-ma-select')?.value;
+  if(!maId){ document.getElementById('wp-stamm-grid').innerHTML='<div class="tm">Bitte Mitarbeiter wählen</div>'; return; }
+  const ma = allMA.find(m=>m.id===maId);
+  const wpMA = allWP.filter(w=>w.mitarbeiter_id===maId&&w.aktiv);
+  const tage = ['–','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+  if(wpMA.length===0){
+    document.getElementById('wp-stamm-grid').innerHTML=`<div class="alert al-i"><span>💡</span><div class="al-txt"><strong>Noch keine Einträge für ${ma.vorname} ${ma.nachname}</strong>Klick "+ Eintrag hinzufügen" um den Wochenplan zu befüllen.</div></div>`;
+    return;
+  }
+
+  // Group by day
+  const byDay = {};
+  wpMA.forEach(w=>{ if(!byDay[w.wochentag]) byDay[w.wochentag]=[]; byDay[w.wochentag].push(w); });
+
+  let html = '';
+  [1,2,3,4,5,6].forEach(tag=>{
+    const eintraege = (byDay[tag]||[]).sort((a,b)=>a.uhrzeit_von>b.uhrzeit_von?1:-1);
+    if(eintraege.length===0) return;
+    html += `<div style="margin-bottom:14px;">
+      <div class="fw7" style="font-size:13px;color:var(--accent);margin-bottom:8px;">${tage[tag]}</div>`;
+    eintraege.forEach(w=>{
+      const ku = allKU.find(k=>k.id===w.kunde_id);
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:var(--s2);border:1px solid var(--border);border-radius:7px;margin-bottom:6px;font-size:13px;">
+        <span style="font-family:'DM Mono',monospace;color:var(--accent);font-weight:700;min-width:110px;">${w.uhrzeit_von||'?'} – ${w.uhrzeit_bis||'?'}</span>
+        <span class="fw7">${ku?ku.nachname+', '+ku.vorname:'Unbekannter Kunde'}</span>
+        <span class="tag">${w.rhythmus||'wöchentlich'}</span>
+        ${w.notiz?`<span class="tm">${w.notiz}</span>`:''}
+        <button class="btn btn-danger btn-xs" style="margin-left:auto;" onclick="deleteWPEintrag('${w.id}')">×</button>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  document.getElementById('wp-stamm-grid').innerHTML = html;
+}
+
+function renderWochenplanEchte(){
+  // Update wp-ma-select options when data loads
+  populateWPSelects();
+}
+
+async function saveWPEintrag(){
+  const maId = v('wp-ma-modal');
+  const kuId = v('wp-ku-modal');
+  const tag = v('wp-tag');
+  const von = v('wp-von');
+  const bis = v('wp-bis');
+  if(!maId||!kuId||!tag){toast('Mitarbeiter, Kunde und Tag erforderlich','error');return;}
+
+  const {error} = await db.from('wochenplan').insert({
+    mitarbeiter_id: maId,
+    kunde_id: kuId,
+    wochentag: parseInt(tag),
+    uhrzeit_von: von+':00',
+    uhrzeit_bis: bis+':00',
+    rhythmus: v('wp-rhythmus')||'wöchentlich',
+    notiz: v('wp-notiz')||null,
+    aktiv: true
+  });
+
+  if(error){toast('Fehler: '+error.message,'error');return;}
+  closeModal('m-wp-eintrag');
+  toast('Eintrag gespeichert ✓','success');
+  await loadAll();
+  // Stay on stamm tab and re-select MA
+  switchWPTab('stamm');
+  setTimeout(()=>{
+    const sel = document.getElementById('wp-ma-select');
+    if(sel) { sel.value=maId; renderWPStamm(); }
+  },500);
+}
+
+async function deleteWPEintrag(id){
+  if(!confirm('Eintrag löschen?')) return;
+  await db.from('wochenplan').update({aktiv:false}).eq('id',id);
+  toast('Eintrag entfernt','success');
+  await loadAll();
+  renderWPStamm();
+}
+
+// ═══ TERMIN-BERECHNUNG FÜR EG ═══════════════
+function berechneFreienTermin(maId, neueKundeAdresse){
+  const ma = allMA.find(m=>m.id===maId);
+  if(!ma) return null;
+
+  const tage = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const heute = new Date();
+  const heuteTag = heute.getDay(); // 0=So, 1=Mo...
+
+  // Finde alle WP-Einträge des MA
+  const wpMA = allWP.filter(w=>w.mitarbeiter_id===maId&&w.aktiv);
+  if(wpMA.length===0){
+    // Kein Wochenplan → nutze Verfügbarkeit
+    return { text: 'Kein Wochenplan hinterlegt · Verfügbarkeit: '+(ma.verfuegbarkeit||'unbekannt'), frueherTermin: null };
+  }
+
+  // Suche nächsten freien Slot ab morgen
+  let result = [];
+  for(let dayOffset=1; dayOffset<=14; dayOffset++){
+    const checkDate = new Date(heute);
+    checkDate.setDate(heute.getDate()+dayOffset);
+    const checkWochentag = checkDate.getDay()===0?7:checkDate.getDay(); // 1=Mo...6=Sa
+
+    // WP Einträge für diesen Tag
+    const tagEintraege = wpMA.filter(w=>w.wochentag===checkWochentag)
+      .sort((a,b)=>a.uhrzeit_bis>b.uhrzeit_bis?-1:1); // Letzter zuerst
+
+    if(tagEintraege.length===0) continue;
+
+    // Letzter Einsatz des Tages
+    const letzter = tagEintraege[0];
+    const [bisH, bisM] = (letzter.uhrzeit_bis||'12:00').split(':').map(Number);
+
+    // Fahrtzeit schätzen (20 Min Standard, bis echte Google Maps Berechnung)
+    const fahrtMinuten = 20;
+    const freiMinuten = bisH*60 + bisM + fahrtMinuten;
+    const freiH = Math.floor(freiMinuten/60);
+    const freiMin = freiMinuten%60;
+    const freiZeit = `${String(freiH).padStart(2,'0')}:${String(freiMin).padStart(2,'0')}`;
+
+    const datumStr = checkDate.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'short'});
+
+    result.push({
+      datum: checkDate,
+      datumStr,
+      freiAb: freiZeit,
+      letzterKunde: allKU.find(k=>k.id===letzter.kunde_id),
+      text: `${datumStr} ab ${freiZeit} Uhr`
+    });
+
+    if(result.length>=3) break;
+  }
+
+  return result;
+}
+
+// Erweitere suggestMA um Terminberechnung
+function updateMASuggestionWithTermin(maId, el){
+  const ergebnisse = berechneFreienTermin(maId, v('eg-plz'));
+  if(!ergebnisse||ergebnisse.length===0) return;
+
+  const terminDiv = el.querySelector('.ma-termin-info');
+  if(terminDiv){
+    terminDiv.innerHTML = ergebnisse.slice(0,2).map(r=>
+      `<div style="color:var(--accent);font-size:11px;">📅 ${r.text}</div>`
+    ).join('');
+  }
+}
+
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{
   if(e.target!==o) return;
   if(o.id==='m-eg'){
