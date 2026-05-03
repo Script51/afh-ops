@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -7,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AFH · OPS Frankfurt</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -587,7 +585,7 @@ tr:hover td{background:var(--s2);}
 <!-- ERSTGESPRÄCH -->
 <div class="modal-overlay" id="m-eg">
   <div class="modal">
-    <div class="modal-t" id="eg-modal-title">📞 Erstgespräch <span class="modal-x" onclick="closeModal('m-eg')">×</span></div>
+    <div class="modal-t" id="eg-modal-title">📞 Erstgespräch <span class="modal-x" onclick="closeEGModal()">×</span></div>
 
     <!-- STEP INDICATOR -->
     <div class="step-indicator">
@@ -599,13 +597,26 @@ tr:hover td{background:var(--s2);}
     <div class="eg-step active" id="eg-step-1">
       <div class="alert al-i" style="margin-bottom:14px;font-size:12px;"><span>📞</span><div><strong>Teil 1 – Telefonat</strong> · Grunddaten aufnehmen · System schlägt passenden Mitarbeiter vor</div></div>
 
-      <div class="fr"><div class="fg"><label class="fl">Vorname</label><input type="text" class="fi" id="eg-vn"></div><div class="fg"><label class="fl">Nachname</label><input type="text" class="fi" id="eg-nn"></div></div>
-      <div class="fr"><div class="fg"><label class="fl">Telefon</label><input type="text" class="fi" id="eg-tel"></div>
+      <!-- Fehleranzeige -->
+      <div id="eg-error" style="display:none;background:rgba(255,68,102,.12);border:1px solid rgba(255,68,102,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--danger);font-weight:700;"></div>
+
+      <div class="fr"><div class="fg"><label class="fl">Vorname</label><input type="text" class="fi" id="eg-vn" oninput="egDirty=true"></div><div class="fg"><label class="fl">Nachname</label><input type="text" class="fi" id="eg-nn" oninput="egDirty=true"></div></div>
+      <div class="fr"><div class="fg"><label class="fl">Telefon</label><input type="text" class="fi" id="eg-tel" oninput="egDirty=true"></div><div class="fg"><label class="fl">Std/Woche (ca.)</label><input type="number" class="fi" id="eg-std" step="0.5" oninput="egDirty=true"></div></div>
+
+      <div class="fg"><label class="fl">Straße + Hausnummer</label>
+        <input type="text" class="fi" id="eg-strasse" placeholder="Musterstraße 12" oninput="egDirty=true;onEgAdresseChange()">
+      </div>
+      <div class="fr3">
         <div class="fg"><label class="fl">PLZ</label>
-          <input type="text" class="fi" id="eg-plz" oninput="onEgPlzChange(this.value)" placeholder="z.B. 60488">
+          <input type="text" class="fi" id="eg-plz" placeholder="60488" oninput="egDirty=true;onEgPlzChange(this.value)">
+        </div>
+        <div class="fg"><label class="fl">Ort</label>
+          <input type="text" class="fi" id="eg-ort" placeholder="Frankfurt am Main" oninput="egDirty=true" value="Frankfurt am Main">
+        </div>
+        <div class="fg"><label class="fl">Stadtteil (auto)</label>
+          <input type="text" class="fi" id="eg-st" placeholder="wird erkannt…" oninput="egDirty=true">
         </div>
       </div>
-      <div class="fr"><div class="fg"><label class="fl">Stadtteil</label><input type="text" class="fi" id="eg-st"></div><div class="fg"><label class="fl">Std/Woche (ca.)</label><input type="number" class="fi" id="eg-std" step="0.5"></div></div>
 
       <div class="sdiv"><span>Pflegesituation</span></div>
       <div class="fr">
@@ -654,11 +665,31 @@ tr:hover td{background:var(--s2);}
         <div class="fg"><label class="fl">Herkunft</label>
           <select class="fs" id="eg-herkunft"><option>Empfehlung</option><option>Google</option><option>Pflegedienst</option><option>Flyer</option><option>Sanitätshaus</option><option>Sonstiges</option></select></div>
       </div>
-      <div class="fg"><label class="fl">Termin Vor-Ort-Gespräch</label><input type="datetime-local" class="fi" id="eg-termin"></div>
+      <div class="fg"><label class="fl">Termin Vor-Ort-Gespräch</label>
+        <div class="fr">
+          <input type="date" class="fi" id="eg-termin-datum" onchange="egDirty=true;buildEgTermin()">
+          <select class="fs" id="eg-termin-uhrzeit" onchange="egDirty=true;buildEgTermin()">
+            <option value="">– Uhrzeit –</option>
+            <option>07:00</option><option>07:30</option>
+            <option>08:00</option><option>08:30</option>
+            <option>09:00</option><option>09:30</option>
+            <option>10:00</option><option>10:30</option>
+            <option>11:00</option><option>11:30</option>
+            <option>12:00</option><option>12:30</option>
+            <option>13:00</option><option>13:30</option>
+            <option>14:00</option><option>14:30</option>
+            <option>15:00</option><option>15:30</option>
+            <option>16:00</option><option>16:30</option>
+            <option>17:00</option><option>17:30</option>
+            <option>18:00</option>
+          </select>
+        </div>
+        <input type="hidden" id="eg-termin">
+      </div>
 
       <!-- MA VORSCHLAG -->
       <div id="eg-ma-suggestion" style="display:none;">
-        <div class="sdiv"><span>Mitarbeiter-Vorschlag (basierend auf PLZ)</span></div>
+        <div class="sdiv"><span>Passende Mitarbeiter (PLZ + Kapazität + Verfügbarkeit)</span></div>
         <div id="eg-ma-list"></div>
         <input type="hidden" id="eg-ma-selected">
       </div>
@@ -672,7 +703,7 @@ tr:hover td{background:var(--s2);}
       <div class="fg"><label class="fl">Notizen Telefonat</label><textarea class="fta" id="eg-notizen" placeholder="Besonderheiten, Wünsche…"></textarea></div>
 
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-eg')">Abbrechen</button>
+        <button class="btn btn-secondary" onclick="closeEGModal()">Abbrechen</button>
         <button class="btn btn-primary" onclick="saveEGTeil1()">Speichern + Termin anlegen →</button>
       </div>
     </div>
@@ -787,6 +818,7 @@ let allQueueTasks = JSON.parse(localStorage.getItem('afh_queue')||'[]');
 let mapInstance=null, activeFilters=new Set(), empMarkers={}, custMarkers=[];
 let weekOffset=0;
 let currentEGId=null;
+let egDirty=false; // tracks if EG form has unsaved changes
 
 function saveQueueTasks(){
   localStorage.setItem('afh_queue', JSON.stringify(allQueueTasks));
@@ -1106,18 +1138,46 @@ function renderEG(){
 }
 
 // ═══ EG LOGIK ═══════════════════════════════
+function closeEGModal(){
+  if(egDirty){
+    if(!confirm('Willst du wirklich abbrechen? Alle eingegebenen Daten gehen verloren.')) return;
+  }
+  egDirty=false;
+  closeModal('m-eg');
+}
+
+function buildEgTermin(){
+  const d=document.getElementById('eg-termin-datum').value;
+  const t=document.getElementById('eg-termin-uhrzeit').value;
+  if(d&&t) document.getElementById('eg-termin').value=d+'T'+t+':00';
+  else document.getElementById('eg-termin').value='';
+}
+
 function openEGNeu(){
   currentEGId=null;
+  egDirty=false;
   showEGStep(1);
-  // Reset Teil 1
-  ['eg-vn','eg-nn','eg-tel','eg-plz','eg-st','eg-std','eg-koop','eg-hausarzt','eg-notizen'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['eg-vn','eg-nn','eg-tel','eg-plz','eg-st','eg-std','eg-koop','eg-hausarzt','eg-notizen','eg-strasse','eg-ort'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value=(id==='eg-ort'?'Frankfurt am Main':'');
+  });
   ['eg-privat','eg-beihilfe','eg-pflege'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
   document.getElementById('eg-pg').value='';
   document.getElementById('eg-kasse').value='';
   document.getElementById('eg-bedarf').value='Haushalt';
   document.getElementById('eg-herkunft').value='Empfehlung';
+  document.getElementById('eg-termin-datum').value='';
+  document.getElementById('eg-termin-uhrzeit').value='';
+  document.getElementById('eg-termin').value='';
   document.getElementById('eg-ma-suggestion').style.display='none';
   document.getElementById('eg-ma-selected').value='';
+  const errDiv=document.getElementById('eg-error');
+  if(errDiv) errDiv.style.display='none';
+  // Set dirty on any input change
+  document.querySelectorAll('#eg-step-1 .fi, #eg-step-1 .fs, #eg-step-1 .fta').forEach(el=>{
+    el.addEventListener('input',()=>egDirty=true,{once:false});
+    el.addEventListener('change',()=>egDirty=true,{once:false});
+  });
   openModal('m-eg');
 }
 
@@ -1144,44 +1204,99 @@ function showEGStep(n){
   document.getElementById('eg-modal-title').innerHTML=`${n===1?'📞':'🏠'} Erstgespräch Teil ${n}/2 <span class="modal-x" onclick="closeModal('m-eg')">×</span>`;
 }
 
+function onEgAdresseChange(){
+  // Auto-suggest based on PLZ if already filled
+  const plz=v('eg-plz');
+  if(plz.length>=4) suggestMA(plz);
+}
+
 function onEgPlzChange(plz){
-  if(plz.length<4)return;
+  // Auto-fill Stadtteil based on Frankfurt PLZ
+  const plzStadtteile={
+    '60306':'Innenstadt','60308':'Westend','60311':'Innenstadt','60313':'Innenstadt',
+    '60314':'Ostend','60316':'Sachsenhausen','60318':'Nordend','60320':'Nordend',
+    '60322':'Nordend','60323':'Westend','60325':'Westend','60326':'Gallus',
+    '60327':'Gallus','60329':'Bahnhofsviertel','60385':'Bornheim','60386':'Fechenheim',
+    '60388':'Bergen-Enkheim','60389':'Bornheim','60431':'Hausen','60433':'Praunheim',
+    '60435':'Praunheim','60437':'Niederursel','60438':'Niederursel','60439':'Niederursel',
+    '60486':'Bockenheim','60487':'Bockenheim','60488':'Rödelheim','60489':'Sossenheim',
+    '60528':'Niederrad','60529':'Niederrad','60549':'Flughafen','60594':'Sachsenhausen',
+    '60596':'Sachsenhausen','60598':'Sachsenhausen','60599':'Sachsenhausen',
+    '65760':'Eschborn','65824':'Schwalbach','65936':'Sindlingen'
+  };
+  if(plzStadtteile[plz]){
+    document.getElementById('eg-st').value=plzStadtteile[plz];
+  }
   clearTimeout(window.plzTimer);
-  window.plzTimer=setTimeout(()=>suggestMA(plz),500);
+  if(plz.length>=4) window.plzTimer=setTimeout(()=>suggestMA(plz),600);
 }
 
 function suggestMA(plz){
+  const stdWoche=parseFloat(v('eg-std'))||4;
+
   const matches=allMA.filter(m=>{
-    if(m.status!=='aktiv')return false;
+    if(m.status!=='aktiv') return false;
     const gebiete=(m.einsatzgebiete||m.plz||'').replace(/\s/g,'');
-    return gebiete.includes(plz);
+    return gebiete.includes(plz) || (m.plz||'').includes(plz);
   });
 
-  if(matches.length===0){
+  // Also include nearby MA if none found in exact PLZ
+  const allCandidates = matches.length > 0 ? matches : allMA.filter(m=>m.status==='aktiv').slice(0,5);
+
+  if(allCandidates.length===0){
     document.getElementById('eg-ma-suggestion').style.display='none';
     return;
   }
 
   document.getElementById('eg-ma-suggestion').style.display='block';
-  const html=matches.slice(0,3).map((ma,i)=>{
+
+  const html=allCandidates.slice(0,4).map((ma,i)=>{
     const color=COLORS[allMA.indexOf(ma)%COLORS.length];
     const init=((ma.vorname||'').charAt(0)+(ma.nachname||'').charAt(0)).toUpperCase();
     const kc=allKU.filter(k=>k.mitarbeiter_id===ma.id).length;
-    const score=Math.max(60,95-i*12-kc*2);
-    return `<div class="ma-sug-item" onclick="selectMA('${ma.id}',this)">
+    const maxKunden=5; // ca. 5 Kunden = Vollauslastung
+    const kapPct=Math.round(kc/maxKunden*100);
+    const hatKapazitaet=kc<maxKunden;
+    const plzMatch=(m=>(m.einsatzgebiete||m.plz||'').replace(/\s/g,'').includes(plz))(ma);
+
+    // Score berechnen
+    let score=50;
+    if(plzMatch) score+=30;
+    if(hatKapazitaet) score+=15;
+    if(kc<3) score+=10;
+    score=Math.min(98,score-i*5);
+
+    // Nächster freier Termin berechnen
+    const heute=new Date();
+    const nextFrei=new Date(heute);
+    nextFrei.setDate(heute.getDate()+1);
+    // Wenn MA voll, nächste Woche
+    if(!hatKapazitaet) nextFrei.setDate(heute.getDate()+7);
+    const nextFreiStr=nextFrei.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
+
+    const kapColor=kapPct>90?'var(--danger)':kapPct>70?'var(--warn)':'var(--accent)';
+
+    return `<div class="ma-sug-item" onclick="selectMA('${ma.id}',this)" style="${!hatKapazitaet?'opacity:.7;':''}">
       <div class="ma-av" style="background:${color};color:#000;">${init}</div>
       <div style="flex:1;">
-        <div class="fw7" style="font-size:13px;">${ma.vorname} ${ma.nachname}</div>
-        <div class="tm">${ma.mobilitaet||''} · ${kc} Kunden · PLZ: ${ma.einsatzgebiete||ma.plz||''}</div>
-        <div style="margin-top:3px;">
+        <div class="fw7" style="font-size:13px;">${ma.vorname} ${ma.nachname}
+          ${!hatKapazitaet?'<span class="tag" style="color:var(--danger);">Voll</span>':''}
+          ${plzMatch?'<span class="tag" style="color:var(--blue);">PLZ ✓</span>':''}
+        </div>
+        <div class="tm">${ma.mobilitaet||''} · ${kc}/${maxKunden} Kunden · Auslastung <span style="color:${kapColor};font-weight:700;">${kapPct}%</span></div>
+        <div class="tm" style="margin-top:3px;">📅 Frühester Termin: <span style="color:var(--accent);font-weight:700;">${nextFreiStr}</span></div>
+        <div style="margin-top:4px;">
           ${ma.grundreinigung?'<span class="tag">Grundreinigung ✓</span>':''}
           ${ma.angst_tiere?'<span class="tag" style="color:var(--warn);">Angst Tiere</span>':''}
+          ${ma.allergie?`<span class="tag" style="color:var(--warn);">Allergie: ${ma.allergie}</span>`:''}
         </div>
+        <div class="pbar mt4" style="height:3px;"><div class="pfill ${kapPct>90?'pr':kapPct>70?'po':'pg'}" style="width:${kapPct}%"></div></div>
       </div>
       <div class="ma-score" style="color:${score>=85?'var(--accent)':score>=70?'var(--blue)':'var(--warn)'};">${score}%</div>
     </div>`;
   }).join('');
-  document.getElementById('eg-ma-list').innerHTML=html;
+
+  document.getElementById('eg-ma-list').innerHTML=html||'<div class="tm">Keine passenden Mitarbeiter gefunden</div>';
 }
 
 function selectMA(id,el){
@@ -1192,52 +1307,68 @@ function selectMA(id,el){
 }
 
 async function saveEGTeil1(){
-  const vn=v('eg-vn'),nn=v('eg-nn');
-  if(!vn||!nn){toast('Vor- und Nachname erforderlich','error');return;}
-
-  const termin=v('eg-termin')||null;
-  const maSelected=v('eg-ma-selected')||null;
+  const vn=v('eg-vn'), nn=v('eg-nn');
+  const errDiv=document.getElementById('eg-error');
+  if(!vn||!nn){
+    if(errDiv){errDiv.textContent='❌ Vor- und Nachname sind erforderlich';errDiv.style.display='block';}
+    return;
+  }
+  if(errDiv) errDiv.style.display='none';
 
   const data={
-    vorname:vn,
-    nachname:nn,
+    vorname:vn, nachname:nn,
     telefon:v('eg-tel')||null,
     plz:v('eg-plz')||null,
     stadtteil:v('eg-st')||null,
     stunden_geschaetzt:v('eg-std')?parseFloat(v('eg-std')):null,
-    pflegegrad:v('eg-pg')||null,
-    pflegekasse:v('eg-kasse')||null,
-    privat:cb('eg-privat'),
-    beihilfe:cb('eg-beihilfe'),
-    bedarf:v('eg-bedarf')||'Haushalt',
-    herkunft:v('eg-herkunft')||'Sonstiges',
-    termin_datum:termin,
+    pflegegrad:v('eg-pg')||null, pflegekasse:v('eg-kasse')||null,
+    privat:cb('eg-privat'), beihilfe:cb('eg-beihilfe'),
+    bedarf:v('eg-bedarf')||'Haushalt', herkunft:v('eg-herkunft')||'Sonstiges',
+    termin_datum:v('eg-termin')||null,
     pflegedienst_bedarf:cb('eg-pflege'),
-    kooperation:v('eg-koop')||null,
-    hausarzt:v('eg-hausarzt')||null,
-    notizen:v('eg-notizen')||null,
-    mitarbeiter_id:maSelected,
-    status:termin?'termin':'offen'
+    kooperation:v('eg-koop')||null, hausarzt:v('eg-hausarzt')||null,
+    notizen:((v('eg-strasse')?'Adresse: '+v('eg-strasse')+', '+v('eg-plz')+' '+v('eg-ort')+'\n':'') + (v('eg-notizen')||'')).trim() || null,
+    mitarbeiter_id:v('eg-ma-selected')||null,
+    status:v('eg-termin')?'termin':'offen'
   };
 
   try {
-    let result;
+    let error, newId;
     if(currentEGId){
-      result=await db.from('erstgespraeche').update(data).eq('id',currentEGId).select();
+      const res = await db.from('erstgespraeche').update(data).eq('id',currentEGId);
+      error = res.error;
+      newId = currentEGId;
     } else {
-      result=await db.from('erstgespraeche').insert(data).select();
+      const res = await db.from('erstgespraeche').insert(data);
+      error = res.error;
+      if(!error){
+        // Fetch the newly created record
+        const fetch = await db.from('erstgespraeche')
+          .select('id').eq('vorname',vn).eq('nachname',nn)
+          .order('created_at',{ascending:false}).limit(1);
+        if(fetch.data&&fetch.data.length>0) newId=fetch.data[0].id;
+      }
     }
-    if(result.error){toast('Fehler: '+result.error.message,'error');return;}
-    if(result.data&&result.data.length>0) currentEGId=result.data[0].id;
 
-    // ICS Termin-Export wenn Datum gesetzt
-    if(termin) exportICS(vn+' '+nn, termin);
+    if(error){
+      const msg='DB Fehler: '+error.message;
+      if(errDiv){errDiv.textContent='❌ '+msg;errDiv.style.display='block';}
+      toast(msg,'error');
+      return;
+    }
 
-    toast(`${vn} ${nn} gespeichert ✓`+(termin?' · Termin-Datei wird heruntergeladen':''),'success');
+    if(newId) currentEGId=newId;
+    if(v('eg-termin')) exportICS(vn+' '+nn, v('eg-termin'));
+
+    egDirty=false;
+    toast(`${vn} ${nn} gespeichert ✓`,'success');
     closeModal('m-eg');
     await loadAll();
-  } catch(e){
-    toast('Fehler beim Speichern: '+e.message,'error');
+
+  } catch(err){
+    const msg=err.message||'Unbekannter Fehler';
+    if(errDiv){errDiv.textContent='❌ '+msg;errDiv.style.display='block';}
+    toast('Fehler: '+msg,'error');
   }
 }
 
@@ -1472,18 +1603,19 @@ function generateReport(){
 // ═══ SAVE FUNCTIONS ═════════════════════════
 async function saveMitarbeiter(){
   const data={
-    vorname:v('ma-vn'),nachname:v('ma-nn'),telefon:v('ma-tel'),email:v('ma-email'),
-    adresse:v('ma-adresse'),mobilitaet:v('ma-mob'),verfuegbarkeit:v('ma-verf'),
-    einsatzgebiete:v('ma-gebiete'),
+    vorname:v('ma-vn'),nachname:v('ma-nn'),telefon:v('ma-tel')||null,email:v('ma-email')||null,
+    adresse:v('ma-adresse')||null,mobilitaet:v('ma-mob'),verfuegbarkeit:v('ma-verf')||null,
+    einsatzgebiete:v('ma-gebiete')||null,
     grundreinigung:cb('ma-grundreinigung'),angst_tiere:cb('ma-angst-tiere'),
-    raucher:cb('ma-raucher'),rollstuhl_ok:cb('ma-rollstuhl'),allergie:v('ma-allergie'),
+    raucher:cb('ma-raucher'),rollstuhl_ok:cb('ma-rollstuhl'),allergie:v('ma-allergie')||null,
     eingestellt_am:v('ma-ein')||null,probezeit_bis:v('ma-probe')||null,
     status:'aktiv',kranktage:0,vertretungen:0
   };
   if(!data.vorname||!data.nachname){toast('Vor- und Nachname erforderlich','error');return;}
   const {error}=await db.from('mitarbeiter').insert(data);
   if(error){toast('Fehler: '+error.message,'error');return;}
-  closeModal('m-mitarbeiter');toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
+  closeModal('m-mitarbeiter');
+  toast(`${data.vorname} ${data.nachname} angelegt ✓`,'success');
   await loadAll();
 }
 
@@ -1642,7 +1774,14 @@ function showLocked(){
 }
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{
+  if(e.target!==o) return;
+  if(o.id==='m-eg'){
+    closeEGModal();
+  } else {
+    o.classList.remove('open');
+  }
+}));
 document.getElementById('pin-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('btn-login').disabled)doLogin();});
 </script>
 </body>
