@@ -423,7 +423,7 @@ tr:hover td{background:var(--s2);}
       <div class="content">
         <div class="card mb4"><input type="text" class="fi" placeholder="🔍 Name, Stadtteil, PLZ…" oninput="filterKunden(this.value)" style="margin:0;"></div>
         <div class="card"><div class="tw"><table>
-          <thead><tr><th>Name</th><th>PLZ / Stadtteil</th><th>Std/Wo</th><th>Mitarbeiter</th><th>Besonderheiten</th><th>Status</th></tr></thead>
+          <thead><tr><th>Name</th><th>PLZ / Stadtteil</th><th>Std/Wo</th><th>Mitarbeiter</th><th>Besonderheiten</th><th>Status</th><th></th></tr></thead>
           <tbody id="ku-table"></tbody>
         </table></div></div>
       </div>
@@ -880,6 +880,112 @@ tr:hover td{background:var(--s2);}
   </div>
 </div>
 
+<!-- VP-ANTRAG MODAL -->
+<div class="modal-overlay" id="m-vp-antrag">
+  <div class="modal" style="width:680px;max-width:96vw;">
+    <div class="modal-t">📄 Verhinderungspflege-Antrag <span class="modal-x" onclick="closeModal('m-vp-antrag')">×</span></div>
+
+    <div class="alert al-i mb4" style="font-size:12px;">
+      <span>💡</span><div>Vorausgefüllt mit Kundendaten. Bitte prüfen, ergänzen und als PDF drucken (Cmd+P → Als PDF speichern).</div>
+    </div>
+
+    <div id="vp-form" style="background:#fff;color:#000;padding:28px;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:16px;font-weight:bold;margin-bottom:4px;">Antrag auf Leistungen der Verhinderungspflege</div>
+        <div style="font-size:13px;">gemäß § 39 SGB XI</div>
+        <div style="margin-top:8px;font-size:12px;color:#666;" id="vp-kasse-name">Pflegekasse: –</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+        <div>
+          <div style="font-weight:bold;margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#666;">Pflegebedürftige Person</div>
+          <div style="border:1px solid #ccc;border-radius:4px;padding:8px;">
+            <div style="margin-bottom:6px;"><label style="font-size:11px;color:#666;">Name, Vorname</label>
+              <div id="vp-name" style="font-weight:bold;font-size:14px;"></div></div>
+            <div style="margin-bottom:6px;"><label style="font-size:11px;color:#666;">Geburtsdatum</label>
+              <input type="date" id="vp-geb" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+            <div style="margin-bottom:6px;"><label style="font-size:11px;color:#666;">Versicherungsnummer</label>
+              <input type="text" id="vp-versnum" placeholder="z.B. A123456789" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+            <div><label style="font-size:11px;color:#666;">Pflegegrad</label>
+              <div id="vp-pg" style="font-weight:bold;"></div></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:bold;margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#666;">Pflegeperson (Verhinderungsfall)</div>
+          <div style="border:1px solid #ccc;border-radius:4px;padding:8px;">
+            <div style="margin-bottom:6px;"><label style="font-size:11px;color:#666;">Name der Pflegeperson</label>
+              <input type="text" id="vp-pflegeperson" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+            <div style="margin-bottom:6px;"><label style="font-size:11px;color:#666;">Verhältnis zur pflegebedürftigen Person</label>
+              <select id="vp-verhaeltnis" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;">
+                <option>Familienmitglied</option><option>Nachbar</option><option>Freund/Bekannter</option><option>Ehrenamtliche Person</option>
+              </select></div>
+            <div><label style="font-size:11px;color:#666;">Grund der Verhinderung</label>
+              <select id="vp-grund" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;">
+                <option>Krankheit</option><option>Urlaub</option><option>Erholung</option><option>Sonstiger Grund</option>
+              </select></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:bold;margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#666;">Zeitraum der Verhinderung</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;border:1px solid #ccc;border-radius:4px;padding:10px;">
+          <div><label style="font-size:11px;color:#666;">Von</label>
+            <input type="date" id="vp-von" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+          <div><label style="font-size:11px;color:#666;">Bis</label>
+            <input type="date" id="vp-bis" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+          <div><label style="font-size:11px;color:#666;">Stunden gesamt</label>
+            <input type="number" id="vp-stunden" placeholder="z.B. 8" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:bold;margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#666;">Ersatzpflegeperson (AFH)</div>
+        <div style="border:1px solid #ccc;border-radius:4px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;color:#666;">Name der Ersatzperson</label>
+            <div id="vp-ersatz-name" style="font-weight:bold;"></div></div>
+          <div><label style="font-size:11px;color:#666;">Organisation</label>
+            <div style="font-weight:bold;">AFH Frankfurt</div></div>
+          <div><label style="font-size:11px;color:#666;">Kosten pro Stunde (€)</label>
+            <input type="number" id="vp-kosten" placeholder="z.B. 28.50" step="0.01" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+          <div><label style="font-size:11px;color:#666;">Gesamtbetrag (€)</label>
+            <input type="number" id="vp-gesamt" placeholder="automatisch" step="0.01" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;border:1px solid #ccc;border-radius:4px;padding:10px;">
+        <div style="font-weight:bold;margin-bottom:6px;font-size:11px;text-transform:uppercase;color:#666;">Bankverbindung (für Erstattung)</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+          <div><label style="font-size:11px;color:#666;">IBAN</label>
+            <input type="text" id="vp-iban" placeholder="DE00 0000 0000 0000 0000 00" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+          <div><label style="font-size:11px;color:#666;">BIC</label>
+            <input type="text" id="vp-bic" placeholder="XXXXXXXX" style="width:100%;border:1px solid #ddd;border-radius:3px;padding:4px;font-size:13px;"></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+        <div>
+          <div style="border-bottom:1px solid #000;margin-bottom:4px;height:30px;"></div>
+          <div style="font-size:11px;color:#666;">Ort, Datum</div>
+        </div>
+        <div>
+          <div style="border-bottom:1px solid #000;margin-bottom:4px;height:30px;"></div>
+          <div style="font-size:11px;color:#666;">Unterschrift pflegebedürftige Person / Bevollmächtigte</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;padding:10px;background:#f5f5f5;border-radius:4px;font-size:11px;color:#666;">
+        <strong>Hinweis:</strong> Der Anspruch auf Verhinderungspflege besteht für max. 6 Wochen (42 Tage) pro Kalenderjahr. Das jährliche Budget beträgt 1.612 € (PG 2–5). Nicht verbrauchtes Budget aus der Kurzzeitpflege kann zusätzlich genutzt werden (max. 806 €).
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('m-vp-antrag')">Schließen</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Drucken / Als PDF speichern</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1160,6 +1266,7 @@ function renderKunden(filter=''){
       <td>${ma?`${ma.vorname} ${ma.nachname.charAt(0)}.`:'<span class="badge bo">Offen</span>'}</td>
       <td>${tags||'–'}</td>
       <td><span class="badge ${k.status==='aktiv'?'bg':k.status==='neu'?'bb':'bx'}">${k.status}</span></td>
+      <td><button class="btn btn-danger btn-xs" onclick="deleteKunde('${k.id}','${k.vorname} ${k.nachname}')">×</button></td>
     </tr>`;
   }).join('')||'<tr><td colspan="6" class="tm">Keine Kunden</td></tr>';
 }
@@ -1448,8 +1555,18 @@ async function saveEGTeil1(){
     if(newId) currentEGId=newId;
     if(v('eg-termin')) exportICS(vn+' '+nn, v('eg-termin'));
 
+    // If MA selected, calculate first termin
+    if(data.mitarbeiter_id){
+      const firstT = await getFirstTermin(data.mitarbeiter_id, data.plz||'');
+      if(firstT){
+        await db.from('erstgespraeche').update({
+          notizen: (data.notizen||'') + '\nErster Termin: ' + firstT
+        }).eq('id', newId||currentEGId);
+      }
+    }
+
     egDirty=false;
-    toast(`${vn} ${nn} gespeichert ✓`,'success');
+    toast(`${vn} ${nn} gespeichert ✓`+(data.mitarbeiter_id?' · MA + Termin gespeichert':''),'success');
     closeModal('m-eg');
     await loadAll();
 
@@ -1906,6 +2023,56 @@ function openModal(id){
   if(id==='m-wp-eintrag') populateWPSelects();
 }
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+
+// ═══ VP-ANTRAG ══════════════════════════════
+function openVPAntrag(egId){
+  const eg = allEG.find(e=>e.id===egId);
+  if(!eg){toast('EG nicht gefunden','error');return;}
+  const ma = allMA.find(m=>m.id===eg.mitarbeiter_id);
+
+  // Fill in form
+  document.getElementById('vp-name').textContent = (eg.vorname||'') + ' ' + (eg.nachname||'');
+  document.getElementById('vp-pg').textContent = eg.pflegegrad ? 'Pflegegrad ' + eg.pflegegrad : '–';
+  document.getElementById('vp-kasse-name').textContent = 'Pflegekasse: ' + (eg.pflegekasse||'–');
+  if(ma) document.getElementById('vp-ersatz-name').textContent = ma.vorname + ' ' + ma.nachname;
+
+  // Auto-calc Gesamtbetrag when Stunden/Kosten change
+  const calcGesamt = () => {
+    const st = parseFloat(document.getElementById('vp-stunden').value)||0;
+    const ko = parseFloat(document.getElementById('vp-kosten').value)||0;
+    if(st&&ko) document.getElementById('vp-gesamt').value = (st*ko).toFixed(2);
+  };
+  document.getElementById('vp-stunden').addEventListener('input', calcGesamt);
+  document.getElementById('vp-kosten').addEventListener('input', calcGesamt);
+
+  openModal('m-vp-antrag');
+}
+
+// ═══ DELETE FUNCTIONS ═══════════════════════
+async function deleteKunde(id, name){
+  if(!confirm(`Kunden "${name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
+  const {error} = await db.from('kunden').delete().eq('id', id);
+  if(error){toast('Fehler: '+error.message,'error');return;}
+  toast(`${name} gelöscht ✓`,'success');
+  await loadAll();
+}
+
+async function deleteEG(id){
+  if(!confirm('Dieses Erstgespräch wirklich löschen?')) return;
+  const {error} = await db.from('erstgespraeche').delete().eq('id', id);
+  if(error){toast('Fehler: '+error.message,'error');return;}
+  toast('Erstgespräch gelöscht ✓','success');
+  await loadAll();
+}
+
+// ═══ SAVE EG WITH MA + TERMIN ═══════════════
+// Override saveEGTeil1 to also store MA and first termin
+async function getFirstTermin(maId, plz){
+  const res = berechneFreienTermin(maId, plz);
+  if(!res||res.length===0) return null;
+  return res[0].text;
+}
 
 // ═══ WOCHENPLAN STAMMDATEN ══════════════════
 function switchWPTab(tab){
