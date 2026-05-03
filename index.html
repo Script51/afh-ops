@@ -636,6 +636,27 @@ tr:hover td{background:var(--s2);}
         </div>
       </div>
 
+      <div class="sdiv"><span>Termin Vor-Ort-Gespräch</span></div>
+      <div class="fg">
+        <div class="fr">
+          <div><label class="fl">Datum</label>
+            <input type="date" class="fi" id="eg-termin-datum" onchange="egDirty=true;buildEgTermin()">
+          </div>
+          <div><label class="fl">Uhrzeit</label>
+            <select class="fs" id="eg-termin-uhrzeit" onchange="egDirty=true;buildEgTermin()">
+              <option value="">– Uhrzeit –</option>
+              <option>07:00</option><option>07:30</option><option>08:00</option><option>08:30</option>
+              <option>09:00</option><option>09:30</option><option>10:00</option><option>10:30</option>
+              <option>11:00</option><option>11:30</option><option>12:00</option><option>12:30</option>
+              <option>13:00</option><option>13:30</option><option>14:00</option><option>14:30</option>
+              <option>15:00</option><option>15:30</option><option>16:00</option><option>16:30</option>
+              <option>17:00</option><option>17:30</option><option>18:00</option>
+            </select>
+          </div>
+        </div>
+        <input type="hidden" id="eg-termin">
+      </div>
+
       <div class="sdiv"><span>Pflegesituation</span></div>
       <div class="fr">
         <div class="fg"><label class="fl">Pflegegrad</label>
@@ -683,33 +704,13 @@ tr:hover td{background:var(--s2);}
         <div class="fg"><label class="fl">Herkunft</label>
           <select class="fs" id="eg-herkunft"><option>Empfehlung</option><option>Google</option><option>Pflegedienst</option><option>Flyer</option><option>Sanitätshaus</option><option>Sonstiges</option></select></div>
       </div>
-      <div class="fg"><label class="fl">Termin Vor-Ort-Gespräch</label>
-        <div class="fr">
-          <input type="date" class="fi" id="eg-termin-datum" onchange="egDirty=true;buildEgTermin()">
-          <select class="fs" id="eg-termin-uhrzeit" onchange="egDirty=true;buildEgTermin()">
-            <option value="">– Uhrzeit –</option>
-            <option>07:00</option><option>07:30</option>
-            <option>08:00</option><option>08:30</option>
-            <option>09:00</option><option>09:30</option>
-            <option>10:00</option><option>10:30</option>
-            <option>11:00</option><option>11:30</option>
-            <option>12:00</option><option>12:30</option>
-            <option>13:00</option><option>13:30</option>
-            <option>14:00</option><option>14:30</option>
-            <option>15:00</option><option>15:30</option>
-            <option>16:00</option><option>16:30</option>
-            <option>17:00</option><option>17:30</option>
-            <option>18:00</option>
-          </select>
-        </div>
-        <input type="hidden" id="eg-termin">
-      </div>
+
 
       <!-- MA VORSCHLAG -->
       <div id="eg-ma-suggestion">
         <div class="sdiv"><span>Passende Mitarbeiter · PLZ eingeben für genaue Auswahl</span></div>
         <div id="eg-ma-list">
-          <div class="alert al-i" style="font-size:12px;"><span>💡</span><div>PLZ oben eingeben → System zeigt passende Mitarbeiter mit freiem Termin</div></div>
+          <div style="font-size:12px;color:var(--muted);padding:8px 0;">PLZ eingeben → passende Mitarbeiter werden angezeigt · Nach dem Speichern sucht das System automatisch im Hintergrund</div>
         </div>
         <input type="hidden" id="eg-ma-selected">
       </div>
@@ -724,7 +725,7 @@ tr:hover td{background:var(--s2);}
 
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeEGModal()">Abbrechen</button>
-        <button class="btn btn-primary" onclick="saveEGTeil1()">Speichern + Termin anlegen →</button>
+        <button class="btn btn-primary" id="eg-save-btn" onclick="saveEGTeil1()">Speichern + Termin anlegen →</button>
       </div>
     </div>
 
@@ -1511,10 +1512,16 @@ function selectMA(id,el){
 }
 
 async function saveEGTeil1(){
+  // Prevent double save
+  const saveBtn = document.getElementById('eg-save-btn');
+  if(saveBtn && saveBtn.disabled) return;
+  if(saveBtn) { saveBtn.disabled=true; saveBtn.textContent='Speichern…'; }
+
   const vn=v('eg-vn'), nn=v('eg-nn');
   const errDiv=document.getElementById('eg-error');
   if(!vn||!nn){
     if(errDiv){errDiv.textContent='❌ Vor- und Nachname sind erforderlich';errDiv.style.display='block';}
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Speichern + Termin anlegen →'; }
     return;
   }
   if(errDiv) errDiv.style.display='none';
@@ -1558,6 +1565,7 @@ async function saveEGTeil1(){
       const msg='DB Fehler: '+error.message;
       if(errDiv){errDiv.textContent='❌ '+msg;errDiv.style.display='block';}
       toast(msg,'error');
+      if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Speichern + Termin anlegen →'; }
       return;
     }
 
@@ -1575,9 +1583,29 @@ async function saveEGTeil1(){
     }
 
     egDirty=false;
-    toast(`${vn} ${nn} gespeichert ✓`+(data.mitarbeiter_id?' · MA + Termin gespeichert':''),'success');
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='Speichern + Termin anlegen →'; }
+    toast(`${vn} ${nn} gespeichert ✓`,'success');
     closeModal('m-eg');
     await loadAll();
+
+    // Background MA search - runs after modal closed
+    if(newId && data.plz && !data.mitarbeiter_id){
+      setTimeout(async ()=>{
+        const maVorschlag = findBestMA(data.plz);
+        if(maVorschlag){
+          const firstT = berechneFreienTermin(maVorschlag.id, data.plz);
+          const terminHinweis = firstT&&firstT.length>0 ? '\nMA-Vorschlag: '+maVorschlag.vorname+' '+maVorschlag.nachname+'\nFrühester Termin: '+firstT[0].text : '';
+          if(terminHinweis){
+            await db.from('erstgespraeche').update({
+              mitarbeiter_id: maVorschlag.id,
+              notizen: (data.notizen||'') + terminHinweis
+            }).eq('id', newId);
+            await loadAll();
+            toast('MA-Vorschlag im Hintergrund gespeichert: '+maVorschlag.vorname+' '+maVorschlag.nachname,'success');
+          }
+        }
+      }, 1000);
+    }
 
   } catch(err){
     const msg=err.message||'Unbekannter Fehler';
@@ -2081,6 +2109,24 @@ async function getFirstTermin(maId, plz){
   const res = berechneFreienTermin(maId, plz);
   if(!res||res.length===0) return null;
   return res[0].text;
+}
+
+// ═══ FIND BEST MA ═══════════════════════════
+function findBestMA(plz){
+  if(!plz||allMA.length===0) return null;
+  const aktive = allMA.filter(m=>m.status==='aktiv');
+  // First: PLZ match with capacity
+  const matches = aktive.filter(m=>{
+    const gebiete=(m.einsatzgebiete||m.plz||'').replace(/\s/g,'');
+    return gebiete.includes(plz);
+  });
+  const candidates = matches.length>0 ? matches : aktive;
+  // Sort by least customers (most capacity)
+  return candidates.sort((a,b)=>{
+    const ka=allKU.filter(k=>k.mitarbeiter_id===a.id).length;
+    const kb=allKU.filter(k=>k.mitarbeiter_id===b.id).length;
+    return ka-kb;
+  })[0]||null;
 }
 
 // ═══ WOCHENPLAN STAMMDATEN ══════════════════
