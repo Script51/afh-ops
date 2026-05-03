@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -181,7 +183,13 @@ tr:hover td{background:var(--s2);}
 .we{background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.15);border-radius:3px;padding:2px 5px;font-size:10px;color:var(--accent);margin-bottom:2px;}
 .we.sick{background:rgba(255,68,102,.08);border-color:rgba(255,68,102,.2);color:var(--danger);text-decoration:line-through;}
 
-/* PERF */
+/* QUEUE ITEMS */
+.qi{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:13px;margin-bottom:9px;display:flex;gap:11px;align-items:flex-start;transition:border-color .15s;}
+.qi:hover{border-color:var(--blue);}
+.qi-icon{font-size:20px;flex-shrink:0;}
+
+/* KUNDE KRANK */
+.wartend-item{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .pbar{height:4px;background:var(--s2);border-radius:2px;overflow:hidden;margin-top:5px;}
 .pfill{height:100%;border-radius:2px;}
 .pg{background:var(--accent);}
@@ -353,7 +361,10 @@ tr:hover td{background:var(--s2);}
     <div class="page" id="page-dispo">
       <div class="header">
         <div><div class="hdr-t">Dispo & Vertretung</div><div class="hdr-s">Matching basierend auf Einsatzgebiet & Besonderheiten</div></div>
-        <button class="btn btn-primary btn-sm" onclick="openModal('m-krankmeldung')">+ Ausfall melden</button>
+        <div class="fg-row">
+          <button class="btn btn-secondary btn-sm" onclick="openModal('m-kunde-krank')">😷 Kunde krank</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-krankmeldung')">+ MA Ausfall</button>
+        </div>
       </div>
       <div class="content">
         <div id="dispo-cases"></div>
@@ -732,6 +743,30 @@ tr:hover td{background:var(--s2);}
   </div>
 </div>
 
+<!-- KUNDE KRANK -->
+<div class="modal-overlay" id="m-kunde-krank">
+  <div class="modal">
+    <div class="modal-t">😷 Kunde krank / abwesend <span class="modal-x" onclick="closeModal('m-kunde-krank')">×</span></div>
+    <div class="alert al-i mb4" style="font-size:12px;"><span>💡</span><div>Der Mitarbeiter hat freie Zeit – soll einem wartenden Kunden zugewiesen werden.</div></div>
+    <div class="fg"><label class="fl">Welcher Kunde ist krank?</label>
+      <select class="fs" id="kk-kunde"><option value="">– wählen –</option></select></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Datum Von</label><input type="date" class="fi" id="kk-von"></div>
+      <div class="fg"><label class="fl">Datum Bis</label><input type="date" class="fi" id="kk-bis"></div>
+    </div>
+    <div class="fg"><label class="fl">Freier Mitarbeiter</label>
+      <div id="kk-freier-ma" class="tm" style="padding:8px 0;">Wird nach Kundenauswahl angezeigt…</div>
+    </div>
+    <div class="fg"><label class="fl">Wartende Kunden (ohne festen MA)</label>
+      <div id="kk-wartende"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-kunde-krank')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveKundeKrank()">Freie Zeit einplanen ✓</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -748,9 +783,51 @@ const PINS = { niklas:'1994', buero:'0000' };
 // ═══ STATE ══════════════════════════════════
 let currentUser = null;
 let allMA=[], allKU=[], allEG=[], allVT=[];
+let allQueueTasks = JSON.parse(localStorage.getItem('afh_queue')||'[]');
 let mapInstance=null, activeFilters=new Set(), empMarkers={}, custMarkers=[];
 let weekOffset=0;
 let currentEGId=null;
+
+function saveQueueTasks(){
+  localStorage.setItem('afh_queue', JSON.stringify(allQueueTasks));
+  renderQueue();
+  const offen=allQueueTasks.filter(t=>!t.erledigt).length;
+  document.getElementById('queue-badge').textContent=offen;
+  document.getElementById('queue-count-b').textContent=offen+' offen';
+}
+
+function renderQueue(){
+  const offen=allQueueTasks.filter(t=>!t.erledigt);
+  const erledigt=allQueueTasks.filter(t=>t.erledigt);
+  let html='';
+  if(offen.length===0) html='<div class="alert al-s"><span>✅</span><div class="al-txt fw7">Alle Aufgaben erledigt</div></div>';
+  offen.forEach(t=>{
+    html+=`<div class="qi" id="qt-${t.id}">
+      <div class="qi-icon">📋</div>
+      <div style="flex:1;">
+        <div class="fw7" style="font-size:13px;">${t.message}</div>
+        <div class="tm">${new Date(t.created_at).toLocaleDateString('de-DE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="erledigeTask('${t.id}')">✓ Erledigt</button>
+    </div>`;
+  });
+  if(erledigt.length>0){
+    html+=`<div class="divider"></div><div class="card-title" style="margin-bottom:8px;">✅ Erledigt (${erledigt.length})</div>`;
+    erledigt.slice(-5).reverse().forEach(t=>{
+      html+=`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;opacity:.6;">
+        <span>${t.message}</span><span class="badge bg">✓</span></div>`;
+    });
+  }
+  const el=document.getElementById('queue-items');
+  if(el) el.innerHTML=html||'<div class="tm">Keine Aufgaben</div>';
+}
+
+function erledigeTask(id){
+  const t=allQueueTasks.find(x=>x.id===id);
+  if(t) t.erledigt=true;
+  saveQueueTasks();
+  toast('Aufgabe als erledigt markiert ✓','success');
+}
 
 // ═══ LOGIN ══════════════════════════════════
 function selUser(u) {
@@ -815,7 +892,7 @@ async function loadAll(){
 function renderAll(){
   renderDashboard();renderKunden();renderMA();renderEG();
   renderDispo();renderPerf();renderKap();renderMkt();
-  renderWochenplan();populateSelects();
+  renderWochenplan();populateSelects();renderQueue();
   if(mapInstance)renderMap();
 }
 
@@ -1117,29 +1194,66 @@ function selectMA(id,el){
 async function saveEGTeil1(){
   const vn=v('eg-vn'),nn=v('eg-nn');
   if(!vn||!nn){toast('Vor- und Nachname erforderlich','error');return;}
+
+  const termin=v('eg-termin')||null;
+  const maSelected=v('eg-ma-selected')||null;
+
   const data={
-    vorname:vn,nachname:nn,telefon:v('eg-tel'),plz:v('eg-plz'),stadtteil:v('eg-st'),
-    stunden_geschaetzt:parseFloat(v('eg-std'))||null,
-    pflegegrad:v('eg-pg')||null,pflegekasse:v('eg-kasse')||null,
-    privat:cb('eg-privat'),beihilfe:cb('eg-beihilfe'),
-    bedarf:v('eg-bedarf'),herkunft:v('eg-herkunft'),
-    termin_datum:v('eg-termin')||null,
-    pflegedienst_bedarf:cb('eg-pflege'),kooperation:v('eg-koop'),
-    hausarzt:v('eg-hausarzt'),notizen:v('eg-notizen'),
-    mitarbeiter_id:v('eg-ma-selected')||null,
-    status:v('eg-termin')?'termin':'offen'
+    vorname:vn,
+    nachname:nn,
+    telefon:v('eg-tel')||null,
+    plz:v('eg-plz')||null,
+    stadtteil:v('eg-st')||null,
+    stunden_geschaetzt:v('eg-std')?parseFloat(v('eg-std')):null,
+    pflegegrad:v('eg-pg')||null,
+    pflegekasse:v('eg-kasse')||null,
+    privat:cb('eg-privat'),
+    beihilfe:cb('eg-beihilfe'),
+    bedarf:v('eg-bedarf')||'Haushalt',
+    herkunft:v('eg-herkunft')||'Sonstiges',
+    termin_datum:termin,
+    pflegedienst_bedarf:cb('eg-pflege'),
+    kooperation:v('eg-koop')||null,
+    hausarzt:v('eg-hausarzt')||null,
+    notizen:v('eg-notizen')||null,
+    mitarbeiter_id:maSelected,
+    status:termin?'termin':'offen'
   };
-  let result;
-  if(currentEGId){
-    result=await db.from('erstgespraeche').update(data).eq('id',currentEGId).select().single();
-  } else {
-    result=await db.from('erstgespraeche').insert(data).select().single();
+
+  try {
+    let result;
+    if(currentEGId){
+      result=await db.from('erstgespraeche').update(data).eq('id',currentEGId).select();
+    } else {
+      result=await db.from('erstgespraeche').insert(data).select();
+    }
+    if(result.error){toast('Fehler: '+result.error.message,'error');return;}
+    if(result.data&&result.data.length>0) currentEGId=result.data[0].id;
+
+    // ICS Termin-Export wenn Datum gesetzt
+    if(termin) exportICS(vn+' '+nn, termin);
+
+    toast(`${vn} ${nn} gespeichert ✓`+(termin?' · Termin-Datei wird heruntergeladen':''),'success');
+    closeModal('m-eg');
+    await loadAll();
+  } catch(e){
+    toast('Fehler beim Speichern: '+e.message,'error');
   }
-  if(result.error){toast('Fehler: '+result.error.message,'error');return;}
-  currentEGId=result.data.id;
-  toast(`${vn} ${nn} gespeichert ✓`+(data.termin_datum?' · Termin angelegt':''),'success');
-  closeModal('m-eg');
-  await loadAll();
+}
+
+function exportICS(name, datetimeStr){
+  try {
+    const dt = new Date(datetimeStr);
+    const pad = n=>String(n).padStart(2,'0');
+    const fmt = d=>`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    const end = new Date(dt.getTime()+60*60*1000);
+    const ics=`BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//AFH OPS//DE\nBEGIN:VEVENT\nUID:${Date.now()}@afh-ops\nDTSTAMP:${fmt(new Date())}\nDTSTART:${fmt(dt)}\nDTEND:${fmt(end)}\nSUMMARY:EG – ${name}\nDESCRIPTION:Erstgespräch AFH Frankfurt\nLOCATION:Beim Kunden\nEND:VEVENT\nEND:VCALENDAR`;
+    const blob=new Blob([ics],{type:'text/calendar'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`EG_${name.replace(' ','_')}.ics`;
+    a.click();
+  } catch(e){ console.log('ICS export error',e); }
 }
 
 async function saveEGTeil2(){
@@ -1234,10 +1348,26 @@ function getMatches(vt,kunde){
 }
 
 async function confirmMatch(vtId,maId,maName){
+  const vt=allVT.find(x=>x.id===vtId);
+  const ku=allKU.find(k=>k.id===vt?.kunde_id);
+  const origMA=allMA.find(m=>m.id===vt?.original_ma_id);
+  const datum=vt?.datum?new Date(vt.datum).toLocaleDateString('de-DE'):'?';
+
   await db.from('vertretungen').update({status:'erledigt',vertreter_id:maId}).eq('id',vtId);
   const ma=allMA.find(m=>m.id===maId);
-  if(ma)await db.from('mitarbeiter').update({vertretungen:(ma.vertretungen||0)+1}).eq('id',maId);
-  toast(`✅ ${maName} eingesetzt · Bitte in AFH-Software nachtragen`,'success');
+  if(ma) await db.from('mitarbeiter').update({vertretungen:(ma.vertretungen||0)+1}).eq('id',maId);
+
+  // Queue-Task anlegen
+  allQueueTasks.push({
+    id: Date.now().toString(),
+    message: `AFH-Software: ${maName} für ${ku?.vorname||''} ${ku?.nachname||''} am ${datum} eintragen (ersetzt ${origMA?.vorname||''} ${origMA?.nachname||''})`,
+    typ: 'dispo',
+    erledigt: false,
+    created_at: new Date().toISOString()
+  });
+  saveQueueTasks();
+
+  toast(`✅ ${maName} eingesetzt · Queue-Aufgabe erstellt`,'success');
   await loadAll();
 }
 
@@ -1390,6 +1520,69 @@ async function saveKrankmeldung(){
   await loadAll();go('dispo');
 }
 
+// ═══ KUNDE KRANK ════════════════════════════
+function initKundeKrankModal(){
+  const sel=document.getElementById('kk-kunde');
+  if(!sel)return;
+  sel.innerHTML='<option value="">– wählen –</option>';
+  allKU.forEach(k=>{
+    const o=document.createElement('option');
+    o.value=k.id;
+    o.textContent=`${k.nachname}, ${k.vorname} (${k.plz||k.stadtteil||''})`;
+    sel.appendChild(o);
+  });
+  sel.onchange=onKundeKrankSelect;
+
+  // Wartende Kunden (ohne MA)
+  const wartend=allKU.filter(k=>!k.mitarbeiter_id);
+  document.getElementById('kk-wartende').innerHTML=wartend.length>0
+    ?wartend.map(k=>`<div class="wartend-item">
+        <div><div class="fw7" style="font-size:13px;">${k.nachname}, ${k.vorname}</div>
+        <div class="tm">${k.plz||''} ${k.stadtteil||''} · ${k.stunden_pro_woche||'?'}h/Wo</div></div>
+        <input type="checkbox" class="wartend-cb" value="${k.id}" style="accent-color:var(--accent);width:18px;height:18px;">
+      </div>`).join('')
+    :'<div class="tm">Keine wartenden Kunden ohne Mitarbeiter</div>';
+}
+
+function onKundeKrankSelect(){
+  const kuId=document.getElementById('kk-kunde').value;
+  if(!kuId)return;
+  const ku=allKU.find(k=>k.id===kuId);
+  const ma=allMA.find(m=>m.id===ku?.mitarbeiter_id);
+  document.getElementById('kk-freier-ma').innerHTML=ma
+    ?`<span class="badge bg">${ma.vorname} ${ma.nachname}</span> hat freie Zeit in diesem Zeitraum`
+    :'<span class="tm">Kein Mitarbeiter zugewiesen</span>';
+}
+
+async function saveKundeKrank(){
+  const kuId=document.getElementById('kk-kunde').value;
+  if(!kuId){toast('Bitte Kunden auswählen','error');return;}
+  const ku=allKU.find(k=>k.id===kuId);
+  const ma=allMA.find(m=>m.id===ku?.mitarbeiter_id);
+
+  // Ausgewählte wartende Kunden
+  const selected=[...document.querySelectorAll('.wartend-cb:checked')].map(cb=>cb.value);
+
+  if(ma&&selected.length>0){
+    // Mitarbeiter den wartenden Kunden temporär zuweisen
+    for(const wkId of selected){
+      const wk=allKU.find(k=>k.id===wkId);
+      allQueueTasks.push({
+        id:Date.now().toString()+Math.random(),
+        message:`AFH-Software: ${ma.vorname} ${ma.nachname} übernimmt ${wk?.vorname||''} ${wk?.nachname||''} (${document.getElementById('kk-von').value} bis ${document.getElementById('kk-bis').value}) – ${ku.vorname} ${ku.nachname} ist abwesend`,
+        typ:'kunde-krank',
+        erledigt:false,
+        created_at:new Date().toISOString()
+      });
+    }
+    saveQueueTasks();
+  }
+
+  toast(`Eingetragen · ${selected.length} Aufgabe${selected.length!==1?'n':''} in Queue`,'success');
+  closeModal('m-kunde-krank');
+  go('queue');
+}
+
 // ═══ HELPERS ════════════════════════════════
 function v(id){const el=document.getElementById(id);return el?el.value.trim():'';}
 function cb(id){const el=document.getElementById(id);return el?el.checked:false;}
@@ -1406,6 +1599,22 @@ function populateSelects(){
     sel.innerHTML='<option value="">– wählen –</option>';
     allMA.forEach(ma=>{const o=document.createElement('option');o.value=ma.id;o.textContent=`${ma.vorname} ${ma.nachname}`;if(ma.id===cur)o.selected=true;sel.appendChild(o);});
   });
+  // Kunde krank select
+  const kkSel=document.getElementById('kk-kunde');
+  if(kkSel){
+    const cur=kkSel.value;
+    kkSel.innerHTML='<option value="">– wählen –</option>';
+    allKU.forEach(k=>{const o=document.createElement('option');o.value=k.id;o.textContent=`${k.nachname}, ${k.vorname} (${k.plz||''})`;if(k.id===cur)o.selected=true;kkSel.appendChild(o);});
+    kkSel.onchange=onKundeKrankSelect;
+  }
+  // Wartende Kunden
+  const wDiv=document.getElementById('kk-wartende');
+  if(wDiv){
+    const wartend=allKU.filter(k=>!k.mitarbeiter_id);
+    wDiv.innerHTML=wartend.length>0
+      ?wartend.map(k=>`<div class="wartend-item"><div><div class="fw7" style="font-size:13px;">${k.nachname}, ${k.vorname}</div><div class="tm">${k.plz||''} · ${k.stunden_pro_woche||'?'}h/Wo</div></div><input type="checkbox" class="wartend-cb" value="${k.id}" style="accent-color:var(--accent);width:18px;height:18px;"></div>`).join('')
+      :'<div class="tm">Keine wartenden Kunden</div>';
+  }
 }
 function timeSince(d){
   const diff=Math.floor((new Date()-new Date(d))/60000);
